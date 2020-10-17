@@ -8,6 +8,11 @@
 #include "Dependencies/Lua/lstate.h"
 #include "FuncTraits.h"
 
+template<typename T>
+concept Constructible = requires(T& x) {
+    { T() };
+};
+
 namespace LuaBinding {
     class object;
     class table;
@@ -282,7 +287,21 @@ namespace LuaBinding {
         }
         template<typename T>
         class_table addClass(const char* name);
-        template<typename T>
+        template<typename T> requires Constructible<T>
+        T* alloc(size_t size = 0) {
+            if (meta_ref == LUA_REFNIL) {
+                lua_newtable(this);
+                meta_ref = luaL_ref(this, LUA_REGISTRYINDEX);
+            }
+            auto u = new ((T*)lua_newuserdatauv(this, size == 0 ? sizeof(T) : size, 0)) T();   // +1 | 0 | 1
+            lua_rawgeti(this, LUA_REGISTRYINDEX, meta_ref);                                // +1 | 1 | 2
+            lua_rawgetp(this, -1, detail::key_helper<T>::get());                                         // +1 | 2 | 3
+            lua_remove(this, -2);                                                            // -1 | 3 | 2
+            assert (lua_istable (this, -1));
+            lua_setmetatable(this, -2);                                                // -1 | 2 | 1
+            return u;
+        }
+        template<typename T> requires (!Constructible<T>)
         T* alloc(size_t size = 0) {
             if (meta_ref == LUA_REFNIL) {
                 lua_newtable(this);
@@ -290,7 +309,7 @@ namespace LuaBinding {
             }
             auto u = (T*)lua_newuserdatauv(this, size == 0 ? sizeof(T) : size, 0);   // +1 | 0 | 1
             lua_rawgeti(this, LUA_REGISTRYINDEX, meta_ref);                                // +1 | 1 | 2
-            lua_rawgetp(this, -1, detail::key_helper<T>::get());                                 // +1 | 2 | 3
+            lua_rawgetp(this, -1, detail::key_helper<T>::get());                                         // +1 | 2 | 3
             lua_remove(this, -2);                                                            // -1 | 3 | 2
             assert (lua_istable (this, -1));
             lua_setmetatable(this, -2);                                                // -1 | 2 | 1
