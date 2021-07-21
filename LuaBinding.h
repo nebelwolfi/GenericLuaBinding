@@ -1,6 +1,7 @@
 #pragma once
 
 #include "lua.hpp"
+#include <type_traits>
 
 namespace LuaBinding {
 
@@ -54,27 +55,26 @@ namespace LuaBinding {
         return 0;
     }
     static int pcall(lua_State *L, int narg = 0, int nres = 0) {
-        lua_getglobal(L, "debug");
-        lua_getfield(L, -1, "traceback");
-        lua_remove(L, -2);
-        int errindex = -narg - 2;
-        lua_insert(L, errindex);
-        auto status = lua_pcall(L, narg, nres, errindex);
-        lua_remove(L, errindex);
+        //lua_getglobal(L, "debug");
+        //lua_getfield(L, -1, "traceback");
+        //lua_remove(L, -2);
+        //int errindex = -narg - 2;
+        //lua_insert(L, errindex);
+        auto status = lua_pcall(L, narg, nres, 0);
+        //luaL_traceback(L, L, NULL, 1);
+        //lua_remove(L, errindex);
         return status;
     }
+}
+
 #if LUA_VERSION_NUM < 502
-    static void* lua_newuserdatauv(lua_State *L, size_t sz, int nuvalue)
+#define luaL_tolstring lua_tolstring
+#define LUA_OPEQ 1
+#define LUA_OPLT 2
+#define LUA_OPLE 3
+    inline void* lua_newuserdatauv(lua_State *L, size_t sz, int nuvalue)
     {
         return lua_newuserdata(L, sz);
-    }
-    static int lua_getiuservalue(lua_State *L, int idx, int nuvalue)
-    {
-        return lua_setuservalue(L, idx);
-    }
-    static int lua_newuserdatauv(lua_State *L, int sz, int nuvalue)
-    {
-        return lua_getuservalue(L, idx);
     }
     inline int lua_absindex (lua_State* L, int idx)
     {
@@ -83,14 +83,13 @@ namespace LuaBinding {
         else
             return idx;
     }
-
-    inline void lua_rawgetp (lua_State* L, int idx, void const* p)
+    inline int lua_rawgetp (lua_State* L, int idx, void const* p)
     {
         idx = lua_absindex (L, idx);
         lua_pushlightuserdata (L, const_cast <void*> (p));
         lua_rawget (L,idx);
+        return lua_type(L, -1);
     }
-
     inline void lua_rawsetp (lua_State* L, int idx, void const* p)
     {
         idx = lua_absindex (L, idx);
@@ -99,27 +98,95 @@ namespace LuaBinding {
         lua_insert (L, -2);
         lua_rawset (L, idx);
     }
-
-    static int luaL_gettable(lua_State *L, int idx) {
+    inline int luaL_gettable(lua_State *L, int idx) {
         lua_gettable(L, idx);
         return lua_type(L, -1);
     }
-    static int luaL_getfield(lua_State *L, int idx, const char* name) {
+    inline int luaL_getfield(lua_State *L, int idx, const char* name) {
         lua_getfield(L, idx, name);
         return lua_type(L, -1);
     }
+    inline int lua_compare(lua_State* L, int idx1, int idx2, int op)
+    {
+        switch (op)
+        {
+            case LUA_OPEQ:
+                return lua_equal(L, idx1, idx2);
+            case LUA_OPLT:
+                return lua_lessthan(L, idx1, idx2);
+            case LUA_OPLE:
+                return lua_equal(L, idx1, idx2) || lua_lessthan(L, idx1, idx2);
+            default:
+                return 0;
+        };
+    }
+    inline int get_len(lua_State* L, int idx)
+    {
+        return int(lua_objlen(L, idx));
+    }
+    inline void lua_geti(lua_State *L, int idx, lua_Integer n) {
+        lua_pushinteger(L, n);
+        lua_gettable(L, idx);
+    }
+    inline int lua_isinteger(lua_State *L, int idx) {
+        return lua_isnumber(L, idx);
+    }
+
+    inline int luaL_typeerror( lua_State* L, int arg, const char* tname )
+    {
+        const char* msg;
+        const char* typearg; /* name for the type of the actual argument */
+        if ( luaL_getmetafield( L, arg, "__name" ) == LUA_TSTRING )
+            typearg = lua_tostring( L, -1 ); /* use the given type name */
+        else if ( lua_type( L, arg ) == LUA_TLIGHTUSERDATA )
+            typearg = "light userdata"; /* special name for messages */
+        else
+            typearg = luaL_typename( L, arg ); /* standard name */
+        msg = lua_pushfstring( L, "%s expected, got %s", tname, typearg );
+        return luaL_argerror( L, arg, msg );
+    }
+    inline int luaL_rawget(lua_State* L, int idx)
+    {
+        lua_rawget(L, idx);
+        return lua_type(L, -1);
+    }
+    inline int luaL_getglobal(lua_State*L, const char* name)
+    {
+        lua_getglobal(L, name);
+        return lua_type(L, -1);
+    }
 #else
-    static int luaL_gettable(lua_State *L, int idx) {
+    inline int get_len(lua_State* L, int idx)
+    {
+        lua_len(L, idx);
+        auto len = (int)lua_tointeger(L, -1);
+        lua_pop(L, 1);
+        return len;
+    }
+    inline int luaL_gettable(lua_State *L, int idx) {
         return lua_gettable(L, idx);
     }
-    static int luaL_getfield(lua_State *L, int idx, const char* name) {
+    inline int luaL_getfield(lua_State *L, int idx, const char* name) {
         return lua_getfield(L, idx, name);
     }
+    inline int luaL_rawget(lua_State* L, int idx)
+    {
+        return lua_rawget(L, idx);
+    }
+    inline int luaL_getglobal(lua_State*L, const char* name)
+    {
+        return lua_getglobal(L, name);
+    }
 #endif
-}
 
-#include "LuaBinding/Object.h"
-#include "LuaBinding/Class.h"
-#include "LuaBinding/State.h"
-#include "LuaBinding/Traits.h"
-#include "LuaBinding/Stack.h"
+#include "Object.h"
+#include "Class.h"
+#include "State.h"
+#include "Traits.h"
+#include "Stack.h"
+#include "MemoryTypes.h"
+
+namespace LuaBinding {
+    static Object Nil = Object();
+    static ObjectRef NilRef = ObjectRef();
+}
