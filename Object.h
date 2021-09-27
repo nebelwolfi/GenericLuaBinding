@@ -3,6 +3,20 @@
 
 namespace LuaBinding {
     class ObjectRef;
+    template<typename T>
+    class TableIter
+    {
+    public:
+        typedef std::forward_iterator_tag iterator_category;
+        TableIter(lua_State* L, int index, int base) : L(L), index(index), base(base) { }
+        TableIter operator++() { index++; return *this; }
+        T operator*() { lua_rawgeti(L, base, index); return T(L, -1, false); }
+        bool operator!=(const TableIter& rhs) { return index != rhs.index; }
+    private:
+        lua_State* L;
+        int index;
+        int base;
+    };
 
     class Object {
     protected:
@@ -102,7 +116,7 @@ namespace LuaBinding {
             this->idx = LUA_REFNIL;
         }
 
-        template<typename R, typename ...Params>
+        template<typename R, bool C = false, typename ...Params>
         R call(Params... param) {
             push();
             if constexpr (sizeof...(param) > 0)
@@ -117,7 +131,12 @@ namespace LuaBinding {
                 {
                     throw std::exception(lua_tostring(L, -1));
                 }
-                return LuaBinding::detail::get<R>(L, -1);
+                if constexpr(C) {
+                    auto result = LuaBinding::detail::get<R>(L, -1);
+                    lua_pop(L, 1);
+                    return result;
+                } else
+                    return LuaBinding::detail::get<R>(L, -1);
             }
         }
 
@@ -179,6 +198,28 @@ namespace LuaBinding {
         bool valid()
         {
             return L && this->idx != LUA_REFNIL;
+        }
+
+        virtual int len()
+        {
+            return get_len(L, idx);
+        }
+
+        TableIter<ObjectRef> begin()
+        {
+            return TableIter<ObjectRef>(L, 1, this->idx);
+        }
+        TableIter<ObjectRef> end()
+        {
+            return TableIter<ObjectRef>(L, get_len(L, idx) + 1, this->idx);
+        }
+        TableIter<ObjectRef> begin() const
+        {
+            return TableIter<ObjectRef>(L, 1, this->idx);
+        }
+        TableIter<ObjectRef> end() const
+        {
+            return TableIter<ObjectRef>(L, get_len(L, idx) + 1, this->idx);
         }
     };
 
@@ -322,6 +363,14 @@ namespace LuaBinding {
         {
             lua_rawgeti(L, LUA_REGISTRYINDEX, this->idx);
             auto t = lua_type(L, -1);
+            lua_pop(L, 1);
+            return t;
+        }
+
+        int len() override
+        {
+            lua_rawgeti(L, LUA_REGISTRYINDEX, this->idx);
+            auto t = get_len(L, -1);
             lua_pop(L, 1);
             return t;
         }

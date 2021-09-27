@@ -37,7 +37,11 @@ namespace LuaBinding {
                 std::get<I>(tup) = State(L);
                 assign_tup<I + 1>(L, tup, J - 1);
             }
-            else if constexpr (std::is_same_v<Type, Object>) {
+            else if constexpr (std::is_same_v<Type, ObjectRef> && !std::is_same_v<Type, Object>) {
+                std::get<I>(tup) = ObjectRef(L, I + 1 + J);
+                assign_tup<I + 1>(L, tup, J);
+            }
+            else if constexpr (!std::is_same_v<Type, ObjectRef> && std::is_same_v<Type, Object>) {
                 std::get<I>(tup) = Object(L, I + 1 + J);
                 assign_tup<I + 1>(L, tup, J);
             }
@@ -102,18 +106,18 @@ namespace LuaBinding {
 
     namespace detail {
         template <class T, class Tuple, std::size_t... I>
-        constexpr T* make_from_tuple_impl(void* mem, Tuple&& t, std::index_sequence<I...> )
+        constexpr T* make_from_tuple_impl(void* mem, Tuple&& t, std::index_sequence<I...>)
         {
             return new (mem) T(std::get<I>(std::forward<Tuple>(t))...);
         }
     }
 
     template <class T, class Tuple>
-    constexpr T* make_from_tuple(void* mem, Tuple&& t )
+    constexpr T* make_from_tuple(void* mem, Tuple&& t)
     {
         return detail::make_from_tuple_impl<T>(mem,
-                                               std::forward<Tuple>(t),
-                                               std::make_index_sequence<std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
+            std::forward<Tuple>(t),
+            std::make_index_sequence<std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
     }
 
     template <class T, class... Params>
@@ -123,7 +127,10 @@ namespace LuaBinding {
         static int f(lua_State* L) {
             ParamList params;
             assign_tup(L, params, 1);
-            make_from_tuple<T>(lua_newuserdata (L, sizeof(T)), params);
+            auto m = (void*)new char[sizeof(T)];
+            make_from_tuple<T>(m, params);
+            auto u = (void**)lua_newuserdata(L, sizeof(void*) * 2);
+            *u = (void*)m; *(u + 1) = (void*)0xC0FFEE;
             lua_pushvalue(L, 1);
             lua_setmetatable(L, -2);
             return 1;

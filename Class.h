@@ -51,8 +51,19 @@ namespace LuaBinding {
         {
             push_metatable();
 
+            lua_pushcclosure(L, lua_CGCFunction, 0);
+            lua_setfield(L, -2, "__gc");
+
+            lua_newtable(L);
+            lua_pushcclosure(L, lua_CGCProtector, 0);
+            lua_setfield(L, -2, "__newindex");
+            lua_setmetatable(L, -2);
+
             lua_pushcclosure(L, lua_CIndexFunction, 0);
             lua_setfield(L, -2, "__index");
+
+            lua_pushcclosure(L, lua_EQFunction, 0);
+            lua_setfield(L, -2, "__eq");
 
             lua_pushcclosure(L, lua_CNewIndexFunction, 0);
             lua_setfield(L, -2, "__newindex");
@@ -71,44 +82,107 @@ namespace LuaBinding {
             lua_setfield(L, -2, "Cast");
 
             lua_pop(L, 1);
+
+            push_property_index();
+            lua_pushcfunction(L, get_ptr);
+            lua_setfield(L, -2, "ptr");
+
+            lua_pushcfunction(L, get_vtable);
+            lua_setfield(L, -2, "vTable");
+
+            lua_pop(L, 1);
+
+            push_property_newindex();
+            lua_pushcfunction(L, set_ptr);
+            lua_setfield(L, -2, "ptr");
+
+            lua_pop(L, 1);
         }
     private:
+        static int lua_CGCFunction(lua_State* S)
+        {
+            if (luaL_getmetafield(S, 1, "__cgc"))
+            {
+                lua_pushvalue(S, 1);
+                pcall(S, 1, 0);
+            }
+            auto u = (void**)lua_touserdata(S, 1);
+            if (*(u + 1) == (void*)0xC0FFEE)
+            {
+                delete[] *u;
+            }
+            return 0;
+        }
+        static int lua_CGCProtector(lua_State* S) {
+            if (strcmp(lua_tostring(S, 2), "__gc") == 0)
+            {
+                lua_remove(S, 2);
+                lua_pushstring(S, "__cgc");
+                lua_insert(S, 2);
+            }
+            lua_rawset(S, 1);
+            return 0;
+        }
+        static int get_vtable(lua_State *L)
+        {
+            lua_pushnumber(L, (double)**(uint32_t**)lua_touserdata(L, 1));
+            return 1;
+        }
+        static int get_ptr(lua_State* L)
+        {
+            lua_pushnumber(L, (double)*(uint32_t*)lua_touserdata(L, 1));
+            return 1;
+        }
+        static int set_ptr(lua_State *L)
+        {
+            *(uint32_t*)lua_touserdata(L, 1) = (uint32_t)lua_tonumber(L, 3);
+            return 0;
+        }
         static int tostring(lua_State* S)
         {
             char asdf[128];
             if constexpr (sizeof(ptrdiff_t) == 4)
-                snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, lua_upvalueindex(1)), (ptrdiff_t)topointer(S, 1));
-            else
-                snprintf(asdf, sizeof(asdf), "%s{%llX}", lua_tostring(S, lua_upvalueindex(1)), (ptrdiff_t)topointer(S, 1));
+                snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, lua_upvalueindex(1)), (uint32_t)topointer(S, 1));
+            else if constexpr (sizeof(ptrdiff_t) == 8)
+                snprintf(asdf, sizeof(asdf), "%s{%llX}", lua_tostring(S, lua_upvalueindex(1)), (uint64_t)topointer(S, 1));
             lua_pushstring(S, asdf);
             return 1;
         }
         static void* topointer(lua_State *L, int idx)
         {
-            void* p;
-            if (lua_type(L, idx) != LUA_TUSERDATA) {
-                lua_rawgeti(L, idx, 0xC0FFEE);
-                p = lua_touserdata(L, -1);
-                lua_pop(L, 1);
-            } else {
-                p = lua_touserdata(L, idx);
-            }
-
-            return p;
+            return *(void**)lua_touserdata(L, idx);
+        }
+        static int lua_EQFunction(lua_State* S)
+        {
+            if (!lua_isuserdata(S, 1) || !lua_isuserdata(S, 2)) lua_pushboolean(S, false);
+            else
+                lua_pushboolean(S, *(uint32_t*)lua_touserdata(S, 1) == *(uint32_t*)lua_touserdata(S, 2));
+            return 1;
         }
         static int lua_CIndexFunction(lua_State* S)
         {
-            if (luaL_getmetafield(S, 1, "__cvalid")
-             && strcmp(lua_tostring(S, 2), "ptr") != 0
-             && strcmp(lua_tostring(S, 2), "isValid") != 0)
+            if (strcmp(lua_tostring(S, 2), "ptr") != 0
+                && strcmp(lua_tostring(S, 2), "isValid") != 0
+                && luaL_getmetafield(S, 1, "__valid"))
             {
                 lua_pushvalue(S, 1);
-                if (lua_pcall(S, 1, 1, 0) != LUA_OK)
-                    lua_error(S);
+                lua_call(S, 1, 1);
                 if (!lua_toboolean(S, -1))
                 {
                     lua_pushvalue(S, 1);
-                    luaL_error(S, "Tried to access invalid %s (property '%s')", luaL_tolstring(S, -1, NULL), lua_tostring(S, 2));
+                    if (luaL_getmetafield(S, 1, "__name")) {
+                        char asdf[128];
+                        if constexpr (sizeof(ptrdiff_t) == 4)
+                            snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, lua_upvalueindex(1)), (uint32_t)topointer(S, 1));
+                        else if constexpr (sizeof(ptrdiff_t) == 8)
+                            snprintf(asdf, sizeof(asdf), "%s{%llX}", lua_tostring(S, lua_upvalueindex(1)), (uint64_t)topointer(S, 1));
+                        lua_pop(S, 1);
+
+                        luaL_error(S, "Tried to access invalid %s (property '%s')", asdf, lua_tostring(S, 2));
+                    } else {
+                        lua_pop(S, 1);
+                        luaL_error(S, "Tried to access invalid unknown object (property '%s')", lua_tostring(S, 2));
+                    }
                     return 0; // ??
                 }
                 lua_pop(S, 1);
@@ -120,8 +194,7 @@ namespace LuaBinding {
                 {
                     lua_remove(S, -2);
                     lua_insert(S, 1);
-                    if (pcall(S, lua_gettop(S) - 1, LUA_MULTRET) != LUA_OK)
-                        lua_error(S);
+                    lua_call(S, lua_gettop(S) - 1, LUA_MULTRET);
                     return lua_gettop(S);
                 }
                 else lua_pop(S, 1);
@@ -130,16 +203,15 @@ namespace LuaBinding {
             {
                 lua_pushvalue(S, 2);
                 if (luaL_gettable(S, -2))
-                {
                     return 1;
-                }
                 else lua_pop(S, 1);
             }
+            if (luaL_getmetafield(S, 1, lua_tostring(S, 2)))
+                return 1;
             if (luaL_getmetafield(S, 1, "__cindex"))
             {
                 lua_insert(S, 1);
-                if (pcall(S, lua_gettop(S) - 1, LUA_MULTRET) != LUA_OK)
-                    lua_error(S);
+                lua_call(S, lua_gettop(S) - 1, LUA_MULTRET);
                 return lua_gettop(S);
             }
             return 0;
@@ -154,8 +226,7 @@ namespace LuaBinding {
                     lua_pushvalue(S, 1);
                     lua_pushvalue(S, 2);
                     lua_pushvalue(S, 3);
-                    if (pcall(S, 3, 0) != LUA_OK)
-                        lua_error(S);
+                    lua_call(S, 3, 0);
                     return 0;
                 }
                 else lua_pop(S, 1);
@@ -165,11 +236,13 @@ namespace LuaBinding {
                 lua_pushvalue(S, 1);
                 lua_pushvalue(S, 2);
                 lua_pushvalue(S, 3);
-                if (pcall(S, 3, 0) != LUA_OK)
-                    lua_error(S);
+                lua_call(S, 3, 0);
                 return 0;
             }
-            luaL_error(S, "No writable member %s", lua_tostring(S, 2));
+            lua_getmetatable(S, 1);
+            lua_pushvalue(S, 2);
+            lua_pushvalue(S, 3);
+            lua_settable(S, -3);
             return 0;
         }
     private:
@@ -227,26 +300,61 @@ namespace LuaBinding {
             lua_pop(L, 1);
             return *this;
         }
-
+        
         template<class... Params>
         Class<T>& ctor()
         {
-            if (!luaL_getglobal(L, class_name))
+            auto str = std::string(class_name);
+            if (str.find('.') != std::string::npos)
             {
-                lua_pop(L, 1);
-                push_metatable();
+                auto enclosing_table = str.substr(0, str.find('.'));
+                auto real_class_name = str.substr(str.find('.') + 1);
+                if (!luaL_getglobal(L, enclosing_table.c_str()))
+                {
+                    lua_pop(L, 1);
+                    lua_newtable(L);
+                    lua_pushvalue(L, -1);
+                    lua_setglobal(L, enclosing_table.c_str());
+                }
+                lua_getfield(L, -1, real_class_name.c_str());
+                if (lua_isnil(L, -1))
+                {
+                    lua_pop(L, 1);
+                    push_metatable();
+                }
+
+                lua_createtable(L, 0, 1);
+                lua_pushstring(L, "__call");
+                lua_pushcclosure(L, TraitsCtor<T, Params...>::f, 0);
+                lua_settable(L, -3);
+                lua_pushcclosure(L, lua_CGCProtector, 0);
+                lua_setfield(L, -2, "__newindex");
+
+                lua_setmetatable(L, -2);
+
+                lua_setfield(L, -2, real_class_name.c_str());
+
+                return *this;
+            } else {
+                if (!luaL_getglobal(L, class_name))
+                {
+                    lua_pop(L, 1);
+                    push_metatable();
+                }
+
+                lua_createtable(L, 0, 1);
+                lua_pushstring(L, "__call");
+                lua_pushcclosure(L, TraitsCtor<T, Params...>::f, 0);
+                lua_settable(L, -3);
+                lua_pushcclosure(L, lua_CGCProtector, 0);
+                lua_setfield(L, -2, "__newindex");
+
+                lua_setmetatable(L, -2);
+
+                lua_setglobal(L, class_name);
+
+                return *this;
             }
-
-            lua_createtable(L, 0, 1);
-            lua_pushstring(L, "__call");
-            lua_pushcclosure(L, TraitsCtor<T, Params...>::f, 0);
-            lua_settable(L, -3);
-
-            lua_setmetatable(L, -2);
-
-            lua_setglobal(L, class_name);
-
-            return *this;
         }
 
         Class<T>& make_visible()
@@ -265,7 +373,7 @@ namespace LuaBinding {
         {
             using FnType = decltype (func);
             push_function_index();
-            new (lua_newuserdatauv(L, sizeof(func), 1)) FnType(func);
+            new (lua_newuserdata(L, sizeof(func))) FnType(func);
             lua_pushcclosure(L, TraitsNClass<R, T, Params...>::f, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -277,7 +385,7 @@ namespace LuaBinding {
         {
             using FnType = decltype (func);
             push_function_index();
-            new (lua_newuserdatauv(L, sizeof(func), 1)) FnType(func);
+            new (lua_newuserdata(L, sizeof(func))) FnType(func);
             lua_pushcclosure(L, TraitsClass<R, T, Params...>::f, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -289,7 +397,7 @@ namespace LuaBinding {
         {
             using FnType = std::decay_t<decltype (func)>;
             push_function_index();
-            new (lua_newuserdatauv(L, sizeof(func), 1)) FnType(func);
+            new (lua_newuserdata(L, sizeof(func))) FnType(func);
             lua_pushcclosure(L, TraitsClass<R, T, Params...>::f, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -301,7 +409,7 @@ namespace LuaBinding {
         {
             using FnType = decltype (func);
             push_function_index();
-            new (lua_newuserdatauv(L, sizeof(func), 1)) FnType(func);
+            new (lua_newuserdata(L, sizeof(func))) FnType(func);
             lua_pushcclosure(L, TraitsFunClass<R, T, Params...>::f, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -313,7 +421,7 @@ namespace LuaBinding {
         {
             using FnType = std::decay_t<decltype (func)>;
             push_function_index();
-            new (lua_newuserdatauv(L, sizeof(func), 1)) FnType(func);
+            new (lua_newuserdata(L, sizeof(func))) FnType(func);
             lua_pushcclosure(L, TraitsFunClass<R, T, Params...>::f, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -377,7 +485,7 @@ namespace LuaBinding {
         {
             using func_t = decltype (func);
             push_function_index();
-            new (lua_newuserdatauv(L, sizeof(func), 1)) func_t(func);
+            new (lua_newuserdata(L, sizeof(func))) func_t(func);
             lua_pushcclosure(L, TraitsClassLCFunc<T>::f, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -389,7 +497,7 @@ namespace LuaBinding {
         {
             using FnType = decltype (func);
             push_function_index();
-            new (lua_newuserdatauv(L, sizeof(func), 1)) FnType(func);
+            new (lua_newuserdata(L, sizeof(func))) FnType(func);
             lua_pushcclosure(L, TraitsClassFunLCFunc<T>::f, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -411,7 +519,7 @@ namespace LuaBinding {
         {
             using FnType = decltype (func);
             push_function_index();
-            new (lua_newuserdatauv(L, sizeof(func), 1)) FnType(func);
+            new (lua_newuserdata(L, sizeof(func))) FnType(func);
             lua_pushcclosure(L, TraitsClassFunNLCFunc<T>::f, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -423,7 +531,7 @@ namespace LuaBinding {
         {
             using func_t = decltype (func);
             push_function_index();
-            new (lua_newuserdatauv(L, sizeof(func), 1)) func_t(func);
+            new (lua_newuserdata(L, sizeof(func))) func_t(func);
             lua_pushcclosure(L, TraitsClassCFunc<T>::f, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -446,7 +554,7 @@ namespace LuaBinding {
         {
             using FnType = decltype (func);
             push_function_index();
-            new (lua_newuserdatauv(L, sizeof(func), 1)) FnType(func);
+            new (lua_newuserdata(L, sizeof(func))) FnType(func);
             lua_pushcclosure(L, TraitsClassFunNCFunc<T>::f, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -458,7 +566,7 @@ namespace LuaBinding {
         {
             using FnType = decltype (func);
             push_function_index();
-            new (lua_newuserdatauv(L, sizeof(func), 1)) FnType(func);
+            new (lua_newuserdata(L, sizeof(func))) FnType(func);
             lua_pushcclosure(L, TraitsClassFunCFunc<T>::f, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -490,9 +598,12 @@ namespace LuaBinding {
         template <class R, class... Params>
         Class<T>& meta_fun(const char* name, R(* func)(Params...))
         {
+            if (strcmp(name, "__gc") == 0) {
+                return meta_fun("__cgc", std::forward<decltype(func)>(func));
+            }
             using FnType = decltype (func);
             push_metatable();
-            new (lua_newuserdatauv(L, sizeof(func), 1)) FnType(func);
+            new (lua_newuserdata(L, sizeof(func))) FnType(func);
             lua_pushcclosure(L, TraitsNClass<R, T, Params...>::f, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -502,9 +613,12 @@ namespace LuaBinding {
         template <class R, class... Params>
         Class<T>& meta_fun(const char* name, R(T::* func)(Params...))
         {
+            if (strcmp(name, "__gc") == 0) {
+                return meta_fun("__cgc", std::forward<decltype(func)>(func));
+            }
             using FnType = decltype (func);
             push_metatable();
-            new (lua_newuserdatauv(L, sizeof(func), 1)) FnType(func);
+            new (lua_newuserdata(L, sizeof(func))) FnType(func);
             lua_pushcclosure(L, TraitsClass<R, T, Params...>::f, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -514,9 +628,12 @@ namespace LuaBinding {
         template <class R, class... Params>
         Class<T>& meta_fun(const char* name, R(T::* func)(Params...) const)
         {
+            if (strcmp(name, "__gc") == 0) {
+                return meta_fun("__cgc", std::forward<decltype(func)>(func));
+            }
             using FnType = decltype (func);
             push_metatable();
-            new (lua_newuserdatauv(L, sizeof(func), 1)) FnType(func);
+            new (lua_newuserdata(L, sizeof(func))) FnType(func);
             lua_pushcclosure(L, TraitsClass<R, T, Params...>::f, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -526,9 +643,12 @@ namespace LuaBinding {
         template <class R, class... Params>
         Class<T>& meta_fun(const char* name, std::function<R(Params...)> func)
         {
+            if (strcmp(name, "__gc") == 0) {
+                return meta_fun("__cgc", std::forward<decltype(func)>(func));
+            }
             using FnType = decltype (func);
             push_metatable();
-            new (lua_newuserdatauv(L, sizeof(func), 1)) FnType(func);
+            new (lua_newuserdata(L, sizeof(func))) FnType(func);
             lua_pushcclosure(L, TraitsFunClass<R, T, Params...>::f, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -538,9 +658,12 @@ namespace LuaBinding {
         template <class R, class... Params>
         Class<T>& meta_fun(const char* name, std::function<R(Params...) const> func)
         {
+            if (strcmp(name, "__gc") == 0) {
+                return meta_fun("__cgc", std::forward<decltype(func)>(func));
+            }
             using FnType = decltype (func);
             push_metatable();
-            new (lua_newuserdatauv(L, sizeof(func), 1)) FnType(func);
+            new (lua_newuserdata(L, sizeof(func))) FnType(func);
             lua_pushcclosure(L, TraitsFunClass<R, T, Params...>::f, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -550,6 +673,9 @@ namespace LuaBinding {
         template <class F>
         Class<T>& meta_fun(const char* name, F&& func)
         {
+            if (strcmp(name, "__gc") == 0) {
+                return meta_fun("__cgc", std::forward<decltype(func)>(func));
+            }
             meta_fun(name, static_cast<function_type_t<std::decay_t<F>>>(func));
             return *this;
         }
@@ -557,9 +683,12 @@ namespace LuaBinding {
         template <class R> requires std::is_integral_v<R>
         Class<T>& meta_cfun(const char* name, R(T::*func)(lua_State*))
         {
+            if (strcmp(name, "__gc") == 0) {
+                return meta_cfun("__cgc", std::forward<decltype(func)>(func));
+            }
             using func_t = decltype (func);
             push_metatable();
-            new (lua_newuserdatauv(L, sizeof(func), 1)) func_t(func);
+            new (lua_newuserdata(L, sizeof(func))) func_t(func);
             lua_pushcclosure(L, TraitsClassLCFunc<T>::f, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -569,9 +698,12 @@ namespace LuaBinding {
         template <class R> requires std::is_integral_v<R>
         Class<T>& meta_cfun(const char* name, std::function<R(T*, lua_State*)> func)
         {
+            if (strcmp(name, "__gc") == 0) {
+                return meta_cfun("__cgc", std::forward<decltype(func)>(func));
+            }
             using FnType = decltype (func);
             push_metatable();
-            new (lua_newuserdatauv(L, sizeof(func), 1)) FnType(func);
+            new (lua_newuserdata(L, sizeof(func))) FnType(func);
             lua_pushcclosure(L, TraitsClassFunLCFunc<T>::f, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -581,6 +713,9 @@ namespace LuaBinding {
         template <class R> requires std::is_integral_v<R>
         Class<T>& meta_cfun(const char* name, R(*func)(lua_State*))
         {
+            if (strcmp(name, "__gc") == 0) {
+                return meta_cfun("__cgc", std::forward<decltype(func)>(func));
+            }
             push_metatable();
             lua_pushcclosure(L, func, 0);
             lua_setfield(L, -2, name);
@@ -591,9 +726,12 @@ namespace LuaBinding {
         template <class R> requires std::is_integral_v<R>
         Class<T>& meta_cfun(const char* name, std::function<R(lua_State*)> func)
         {
+            if (strcmp(name, "__gc") == 0) {
+                return meta_cfun("__cgc", std::forward<decltype(func)>(func));
+            }
             using FnType = decltype (func);
             push_metatable();
-            new (lua_newuserdatauv(L, sizeof(func), 1)) FnType(func);
+            new (lua_newuserdata(L, sizeof(func))) FnType(func);
             lua_pushcclosure(L, TraitsClassFunNLCFunc<T>::f, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -603,9 +741,12 @@ namespace LuaBinding {
         template <class R, class U> requires std::is_integral_v<R>
         Class<T>& meta_cfun(const char* name, R(T::*func)(U))
         {
+            if (strcmp(name, "__gc") == 0) {
+                return meta_cfun("__cgc", std::forward<decltype(func)>(func));
+            }
             using func_t = decltype (func);
             push_metatable();
-            new (lua_newuserdatauv(L, sizeof(func), 1)) func_t(func);
+            new (lua_newuserdata(L, sizeof(func))) func_t(func);
             lua_pushcclosure(L, TraitsClassCFunc<T>::f, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -615,6 +756,9 @@ namespace LuaBinding {
         template <class R, class U> requires std::is_integral_v<R>
         Class<T>& meta_cfun(const char* name, R(*func)(U))
         {
+            if (strcmp(name, "__gc") == 0) {
+                return meta_cfun("__cgc", std::forward<decltype(func)>(func));
+            }
             push_metatable();
             lua_pushlightuserdata(L, reinterpret_cast<void*>(func));
             lua_pushcclosure(L, TraitsClassNCFunc<T>::f, 1);
@@ -626,9 +770,12 @@ namespace LuaBinding {
         template <class R, class U> requires std::is_integral_v<R>
         Class<T>& meta_cfun(const char* name, std::function<R(T*, U)> func)
         {
+            if (strcmp(name, "__gc") == 0) {
+                return meta_cfun("__cgc", std::forward<decltype(func)>(func));
+            }
             using FnType = decltype (func);
             push_metatable();
-            new (lua_newuserdatauv(L, sizeof(func), 1)) FnType(func);
+            new (lua_newuserdata(L, sizeof(func))) FnType(func);
             lua_pushcclosure(L, TraitsClassFunCFunc<T>::f, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -638,6 +785,9 @@ namespace LuaBinding {
         template <class F>
         Class<T>& meta_cfun(const char* name, F&& func)
         {
+            if (strcmp(name, "__gc") == 0) {
+                return meta_cfun("__cgc", std::forward<decltype(func)>(func));
+            }
             meta_cfun(name, static_cast<function_type_t<std::decay_t<F>>>(func));
             return *this;
         }
@@ -650,7 +800,7 @@ namespace LuaBinding {
             push_property_index();
 
             push_property_newindex();
-            new (lua_newuserdatauv(L, sizeof(prop), 1)) PropType(prop);
+            new (lua_newuserdata(L, sizeof(prop))) PropType(prop);
             lua_pushvalue(L, -1);
             lua_pushcclosure(L, TraitsClassProperty<std::decay_t<R>, std::decay_t<T>>::set, 1);
             lua_setfield(L, -3, name);
@@ -671,14 +821,14 @@ namespace LuaBinding {
             if (set)
             {
                 push_property_newindex();
-                new (lua_newuserdatauv(L, sizeof(set), 1)) set_t(set);
+                new (lua_newuserdata(L, sizeof(set))) set_t(set);
                 lua_pushcclosure(L, TraitsClassPropertyNFn<R, T>::set, 1);
                 lua_setfield(L, -2, name);
                 lua_pop(L, 1);
             }
 
             push_property_index();
-            new (lua_newuserdatauv(L, sizeof(get), 1)) get_t(get);
+            new (lua_newuserdata(L, sizeof(get))) get_t(get);
             lua_pushcclosure(L, TraitsClassPropertyNFn<R, T>::get, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -694,14 +844,14 @@ namespace LuaBinding {
             if (set)
             {
                 push_property_newindex();
-                new (lua_newuserdatauv(L, sizeof(set), 1)) set_t(set);
+                new (lua_newuserdata(L, sizeof(set))) set_t(set);
                 lua_pushcclosure(L, TraitsClassPropertyFn<R, T>::set, 1);
                 lua_setfield(L, -2, name);
                 lua_pop(L, 1);
             }
 
             push_property_index();
-            new (lua_newuserdatauv(L, sizeof(get), 1)) get_t(get);
+            new (lua_newuserdata(L, sizeof(get))) get_t(get);
             lua_pushcclosure(L, TraitsClassPropertyFn<R, T>::get, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -717,14 +867,14 @@ namespace LuaBinding {
             if (set)
             {
                 push_property_newindex();
-                new (lua_newuserdatauv(L, sizeof(set), 1)) set_t(set);
+                new (lua_newuserdata(L, sizeof(set))) set_t(set);
                 lua_pushcclosure(L, TraitsClassPropertyFn<R, T>::set, 1);
                 lua_setfield(L, -2, name);
                 lua_pop(L, 1);
             }
 
             push_property_index();
-            new (lua_newuserdatauv(L, sizeof(get), 1)) get_t(get);
+            new (lua_newuserdata(L, sizeof(get))) get_t(get);
             lua_pushcclosure(L, TraitsClassPropertyFn<R, T>::get, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -740,14 +890,14 @@ namespace LuaBinding {
             if (set)
             {
                 push_property_newindex();
-                new (lua_newuserdatauv(L, sizeof(set), 1)) set_t(set);
+                new (lua_newuserdata(L, sizeof(set))) set_t(set);
                 lua_pushcclosure(L, TraitsClassPropertyNFunFn<R, T>::set, 1);
                 lua_setfield(L, -2, name);
                 lua_pop(L, 1);
             }
 
             push_property_index();
-            new (lua_newuserdatauv(L, sizeof(get), 1)) get_t(get);
+            new (lua_newuserdata(L, sizeof(get))) get_t(get);
             lua_pushcclosure(L, TraitsClassPropertyNFunFn<R, T>::get, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -763,14 +913,14 @@ namespace LuaBinding {
             if (set)
             {
                 push_property_newindex();
-                new (lua_newuserdatauv(L, sizeof(set), 1)) set_t(set);
+                new (lua_newuserdata(L, sizeof(set))) set_t(set);
                 lua_pushcclosure(L, TraitsClassPropertyFunFn<R, T>::set, 1);
                 lua_setfield(L, -2, name);
                 lua_pop(L, 1);
             }
 
             push_property_index();
-            new (lua_newuserdatauv(L, sizeof(get), 1)) get_t(get);
+            new (lua_newuserdata(L, sizeof(get))) get_t(get);
             lua_pushcclosure(L, TraitsClassPropertyFunFn<R, T>::get, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -800,14 +950,14 @@ namespace LuaBinding {
             if (set)
             {
                 push_property_newindex();
-                new (lua_newuserdatauv(L, sizeof(set), 1)) set_t(set);
+                new (lua_newuserdata(L, sizeof(set))) set_t(set);
                 lua_pushcclosure(L, TraitsClassPropertyNCFun<R, T>::set, 1);
                 lua_setfield(L, -2, name);
                 lua_pop(L, 1);
             }
 
             push_property_index();
-            new (lua_newuserdatauv(L, sizeof(get), 1)) get_t(get);
+            new (lua_newuserdata(L, sizeof(get))) get_t(get);
             lua_pushcclosure(L, TraitsClassPropertyNCFun<R, T>::get, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -823,14 +973,14 @@ namespace LuaBinding {
             if (set)
             {
                 push_property_newindex();
-                new (lua_newuserdatauv(L, sizeof(set), 1)) set_t(set);
+                new (lua_newuserdata(L, sizeof(set))) set_t(set);
                 lua_pushcclosure(L, TraitsClassPropertyCFun<R, T>::set, 1);
                 lua_setfield(L, -2, name);
                 lua_pop(L, 1);
             }
 
             push_property_index();
-            new (lua_newuserdatauv(L, sizeof(get), 1)) get_t(get);
+            new (lua_newuserdata(L, sizeof(get))) get_t(get);
             lua_pushcclosure(L, TraitsClassPropertyCFun<R, T>::get, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -846,14 +996,14 @@ namespace LuaBinding {
             if (set)
             {
                 push_property_newindex();
-                new (lua_newuserdatauv(L, sizeof(set), 1)) set_t(set);
+                new (lua_newuserdata(L, sizeof(set))) set_t(set);
                 lua_pushcclosure(L, TraitsClassPropertyNFunLCFn<R, T>::set, 1);
                 lua_setfield(L, -2, name);
                 lua_pop(L, 1);
             }
 
             push_property_index();
-            new (lua_newuserdatauv(L, sizeof(get), 1)) get_t(get);
+            new (lua_newuserdata(L, sizeof(get))) get_t(get);
             lua_pushcclosure(L, TraitsClassPropertyNFunLCFn<R, T>::get, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -869,14 +1019,14 @@ namespace LuaBinding {
             if (set)
             {
                 push_property_newindex();
-                new (lua_newuserdatauv(L, sizeof(set), 1)) set_t(set);
+                new (lua_newuserdata(L, sizeof(set))) set_t(set);
                 lua_pushcclosure(L, TraitsClassPropertyFunLCFn<R, T>::set, 1);
                 lua_setfield(L, -2, name);
                 lua_pop(L, 1);
             }
 
             push_property_index();
-            new (lua_newuserdatauv(L, sizeof(get), 1)) get_t(get);
+            new (lua_newuserdata(L, sizeof(get))) get_t(get);
             lua_pushcclosure(L, TraitsClassPropertyFunLCFn<R, T>::get, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -892,14 +1042,14 @@ namespace LuaBinding {
             if (set)
             {
                 push_property_newindex();
-                new (lua_newuserdatauv(L, sizeof(set), 1)) set_t(set);
+                new (lua_newuserdata(L, sizeof(set))) set_t(set);
                 lua_pushcclosure(L, TraitsClassPropertyNFunCFn<R, T>::set, 1);
                 lua_setfield(L, -2, name);
                 lua_pop(L, 1);
             }
 
             push_property_index();
-            new (lua_newuserdatauv(L, sizeof(get), 1)) get_t(get);
+            new (lua_newuserdata(L, sizeof(get))) get_t(get);
             lua_pushcclosure(L, TraitsClassPropertyNFunCFn<R, T>::get, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -915,14 +1065,14 @@ namespace LuaBinding {
             if (set)
             {
                 push_property_newindex();
-                new (lua_newuserdatauv(L, sizeof(set), 1)) set_t(set);
+                new (lua_newuserdata(L, sizeof(set))) set_t(set);
                 lua_pushcclosure(L, TraitsClassPropertyFunCFn<R, T>::set, 1);
                 lua_setfield(L, -2, name);
                 lua_pop(L, 1);
             }
 
             push_property_index();
-            new (lua_newuserdatauv(L, sizeof(get), 1)) get_t(get);
+            new (lua_newuserdata(L, sizeof(get))) get_t(get);
             lua_pushcclosure(L, TraitsClassPropertyFunCFn<R, T>::get, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
@@ -945,17 +1095,15 @@ namespace LuaBinding {
 
         static int dyn_read(lua_State *L)
         {
-            if (*(void**)lua_tointeger(L, 2) == nullptr)
+            auto p = (void**)(uint32_t)lua_tonumber(L, 2);
+            if (p == nullptr || *p == nullptr)
             {
                 lua_pushnil(L);
                 return 1;
             }
 
-            lua_createtable(L, 1, 0);
-
-            lua_pushlightuserdata(L, *(void**)(uint32_t)lua_tonumber(L, 2));
-
-            lua_rawseti(L, -2, 0xC0FFEE);
+            auto u = (void**)lua_newuserdata(L, sizeof(void*) * 2);
+            *u = *p; *(u + 1) = 0;
 
             helper<std::remove_pointer_t<std::decay_t<T>>>::push_metatable(L);
             lua_setmetatable(L, -2);
@@ -964,17 +1112,15 @@ namespace LuaBinding {
         }
         static int dyn_cast(lua_State *L)
         {
-            if (lua_tointeger(L, 2) == 0)
+            auto p = (void*)(uint32_t)lua_tonumber(L, 2);
+            if (p == 0)
             {
                 lua_pushnil(L);
                 return 1;
             }
 
-            lua_createtable(L, 1, 0);
-
-            lua_pushlightuserdata(L, (void*)(uint32_t)lua_tonumber(L, 2));
-
-            lua_rawseti(L, -2, 0xC0FFEE);
+            auto u = (void**)lua_newuserdata(L, sizeof(void*) * 2);
+            *u = p; *(u + 1) = 0;
 
             helper<std::remove_pointer_t<std::decay_t<T>>>::push_metatable(L);
             lua_setmetatable(L, -2);

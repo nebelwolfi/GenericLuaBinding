@@ -2,6 +2,7 @@
 
 #include "lua.hpp"
 #include <type_traits>
+#include <stdexcept>
 
 namespace LuaBinding {
 
@@ -54,15 +55,18 @@ namespace LuaBinding {
 
         return 0;
     }
+    static int tack_on_traceback(lua_State* L) {
+        const char * msg = lua_tostring(L, -1);
+        luaL_traceback(L, L, msg, 2);
+        lua_remove(L, -2);
+        return 1;
+    }
     static int pcall(lua_State *L, int narg = 0, int nres = 0) {
-        //lua_getglobal(L, "debug");
-        //lua_getfield(L, -1, "traceback");
-        //lua_remove(L, -2);
-        //int errindex = -narg - 2;
-        //lua_insert(L, errindex);
+        int errindex = lua_gettop(L) - narg;
+        lua_pushcclosure(L, tack_on_traceback, 0);
+        lua_insert(L, errindex);
         auto status = lua_pcall(L, narg, nres, 0);
-        //luaL_traceback(L, L, NULL, 1);
-        //lua_remove(L, errindex);
+        lua_remove(L, errindex);
         return status;
     }
 }
@@ -72,10 +76,6 @@ namespace LuaBinding {
 #define LUA_OPEQ 1
 #define LUA_OPLT 2
 #define LUA_OPLE 3
-    inline void* lua_newuserdatauv(lua_State *L, size_t sz, int nuvalue)
-    {
-        return lua_newuserdata(L, sz);
-    }
     inline int lua_absindex (lua_State* L, int idx)
     {
         if (idx > LUA_REGISTRYINDEX && idx < 0)
@@ -158,10 +158,7 @@ namespace LuaBinding {
 #else
     inline int get_len(lua_State* L, int idx)
     {
-        lua_len(L, idx);
-        auto len = (int)lua_tointeger(L, -1);
-        lua_pop(L, 1);
-        return len;
+        return lua_rawlen(L, idx);
     }
     inline int luaL_gettable(lua_State *L, int idx) {
         return lua_gettable(L, idx);
@@ -179,12 +176,12 @@ namespace LuaBinding {
     }
 #endif
 
-#include "Object.h"
-#include "Class.h"
-#include "State.h"
-#include "Traits.h"
-#include "Stack.h"
-#include "MemoryTypes.h"
+#include "LuaBinding/Object.h"
+#include "LuaBinding/Class.h"
+#include "LuaBinding/State.h"
+#include "LuaBinding/Traits.h"
+#include "LuaBinding/Stack.h"
+#include "LuaBinding/MemoryTypes.h"
 
 namespace LuaBinding {
     static Object Nil = Object();

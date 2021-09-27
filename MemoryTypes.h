@@ -18,7 +18,6 @@ namespace LuaBinding {
         null = -0x10000,
         cstruct = -0x20000,
         vector = -0x40000,
-        array = -0x80000,
         point = -0x100000,
         udata = -0x200000,
         stdstring = -0x400000,

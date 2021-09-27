@@ -30,6 +30,22 @@ namespace LuaBinding {
         }
 
         template<class T> requires is_pushable<T>
+        T extract(lua_State* L, int index)
+        {
+            auto r = Stack<T>::get(L, index);
+            lua_remove(L, index);
+            return r;
+        }
+
+        template<class T> requires (!is_pushable<T>)
+        T extract(lua_State* L, int index)
+        {
+            auto r = StackClass<T>::get(L, index);
+            lua_remove(L, index);
+            return r;
+        }
+
+        template<class T> requires is_pushable<T>
         int push(lua_State* L, T&& t)
         {
             return Stack<T>::push(L, t);
@@ -86,14 +102,18 @@ namespace LuaBinding {
     public:
         static int push(lua_State* L, T& t) requires (!std::is_convertible_v<T, void*>)
         {
-            new (lua_newuserdatauv(L, sizeof(T), 1)) T(t);
+            auto _t = new T(t);
+            auto u = (void**)lua_newuserdata(L, sizeof(void*) * 2);
+            *u = _t; *(u + 1) = (void*)0xC0FFEE;
             helper<std::remove_pointer_t<std::decay_t<T>>>::push_metatable(L);
             lua_setmetatable(L, -2);
             return 1;
         }
         static int push(lua_State* L, T&& t) requires (!std::is_convertible_v<T, void*>)
         {
-            new (lua_newuserdatauv(L, sizeof(T), 1)) T(t);
+            auto _t = new T(t);
+            auto u = (void**)lua_newuserdata(L, sizeof(void*) * 2);
+            *u = _t; *(u + 1) = (void*)0xC0FFEE;
             helper<std::remove_pointer_t<std::decay_t<T>>>::push_metatable(L);
             lua_setmetatable(L, -2);
             return 1;
@@ -105,9 +125,9 @@ namespace LuaBinding {
                 lua_pushnil(L);
                 return 1;
             }
-            lua_createtable(L, 1, 0);
-            lua_pushlightuserdata(L, t);
-            lua_rawseti(L, -2, 0xC0FFEE);
+            auto u = (void**)lua_newuserdata(L, sizeof(void*) * 2);
+            *u = (void*)t; *(u + 1) = 0;
+
             helper<std::remove_pointer_t<std::decay_t<T>>>::push_metatable(L);
             lua_setmetatable(L, -2);
             return 1;
@@ -119,15 +139,18 @@ namespace LuaBinding {
                 lua_pushnil(L);
                 return 1;
             }
-            lua_createtable(L, 1, 0);
-            lua_pushlightuserdata(L, t);
-            lua_rawseti(L, -2, 0xC0FFEE);
+            auto u = (void**)lua_newuserdata(L, sizeof(void*) * 2);
+            *u = (void*)t; *(u + 1) = 0;
             helper<std::remove_pointer_t<std::decay_t<T>>>::push_metatable(L);
             lua_setmetatable(L, -2);
             return 1;
         }
-        static bool is(lua_State* L, int index) {
-            if (!(lua_isuserdata(L, index) || lua_istable(L, index))) return false;
+        static bool is(lua_State* L, int index) requires std::is_same_v<T, void*> {
+            if (!lua_isuserdata(L, index) || !lua_isnumber(L, index)) return false;
+            return true;
+        }
+        static bool is(lua_State* L, int index) requires (!std::is_same_v<T, void*>) {
+            if (!lua_isuserdata(L, index)) return false;
             lua_getmetatable(L, index);
             helper<std::remove_pointer_t<std::decay_t<T>>>::push_metatable(L);
             auto res = lua_compare(L, -1, -2, LUA_OPEQ);
@@ -145,34 +168,13 @@ namespace LuaBinding {
             lua_pop(L, 2);
             return typeid(T).name();
         }
-        static T get(lua_State* L, int index)
+        static T get(lua_State* L, int index) requires (std::is_convertible_v<T, void*>)
         {
-            if (!is(L, index))
-            {
-                if (lua_isnoneornil(L, index))
-                    if constexpr (std::is_convertible_v<T, void*>)
-                        return nullptr;
-                    else
-                        luaL_typeerror(L, index, type_name(L));
-                else
-                    luaL_typeerror(L, index, type_name(L));
-            }
-            void* p;
-            if (lua_type(L, index) == LUA_TTABLE) {
-                lua_rawgeti(L, index, 0xC0FFEE);
-                p = lua_touserdata(L, -1);
-                lua_pop(L, 1);
-            } else {
-                p = lua_touserdata(L, index);
-            }
-
-            if constexpr (std::is_convertible_v<T, void*>){
-                return (T)p;
-            } else if constexpr (std::is_copy_constructible_v<T>) {
-                return T(*(T*)p);
-            } else {
-                return *(T*)p;
-            }
+            return *(T*)lua_touserdata(L, index);
+        }
+        static T get(lua_State* L, int index) requires (!std::is_convertible_v<T, void*>)
+        {
+            return **(T**)lua_touserdata(L, index);
         }
     };
 
