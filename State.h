@@ -8,9 +8,6 @@
 #include <vector>
 #include <functional>
 #include <stdexcept>
-//#include <StackTracer.h>
-//#include <SEH.h>
-//#include <Logger.h>
 
 template <typename T>
 struct identity { typedef T type; };
@@ -25,45 +22,6 @@ namespace LuaBinding {
     template< class T >
     inline constexpr bool is_state_v = std::is_same<T, State*>::value;
 
-    /*** SEH DEBUG ***/
-    /* static int wrap_exceptions2(lua_State *L, lua_CFunction f)
-    {
-        try {
-            return f(L);  // Call wrapped function and return result.
-        } catch (const char *s) {  // Catch and convert exceptions.
-            luaL_traceback(L, L, NULL, 1);
-            const char* lerr = lua_tostring(L, -1); // -0
-            Logger::Print("const char *s %s\n%s", s, lerr);
-            lua_pop(L, 1);
-            lua_pushstring(L, s);
-        } catch (std::exception& e) {
-            luaL_traceback(L, L, NULL, 1);
-            const char* lerr = lua_tostring(L, -1); // -0
-            Logger::Print("std::exception& %s\n%s", e.what(), lerr);
-            lua_pop(L, 1);
-            lua_pushstring(L, e.what());
-        } catch (...) {
-            luaL_traceback(L, L, NULL, 1);
-            const char* lerr = lua_tostring(L, -1); // -0
-            Logger::Print("...\n%s", lerr);
-            lua_pop(L, 1);
-            lua_pushliteral(L, "caught (...)");
-        }
-        return lua_error(L);  // Rethrow as a Lua error.
-    }
-
-    static int wrap_exceptions(lua_State *L, lua_CFunction f)
-    {
-        __try {
-            return wrap_exceptions2(L, f);
-        }
-        __except (StackTracer::ExceptionFilter((EXCEPTION_POINTERS*)_exception_info()))
-        {
-            Logger::Print(StackTracer::GetExceptionMsg("Wrapped C Function"));
-        }
-        return 0;
-    }*/
-
     class State {
         lua_State* L = nullptr;
         bool view = false;
@@ -77,12 +35,6 @@ namespace LuaBinding {
             lua_setglobal(L, "__METASTORE");
             lua_newtable(L);
             lua_setglobal(L, "__DATASTORE");
-
-#ifdef LUAJIT_MODE_ON
-            //lua_pushlightuserdata(L, (void *)wrap_exceptions);
-            //luaJIT_setmode(L, -1, LUAJIT_MODE_WRAPCFUNC|LUAJIT_MODE_ON);
-            //lua_pop(L, 1);
-#endif
         }
         State(lua_State*L) : L(L), view(true) { }
         State(const State& state) : L(state.L), view(true) { }
@@ -379,6 +331,18 @@ namespace LuaBinding {
         operator lua_State* ()
         {
             return L;
+        }
+
+        template<class ...Params>
+        void error(const char* format, Params... p)
+        {
+            luaL_error(L, format, std::forward<Params...>(p)...);
+        }
+
+        template<class ...Params>
+        void error_if(bool cond, const char* format, Params... p)
+        {
+            if (cond) luaL_error(L, format, std::forward<Params...>(p)...);
         }
 
         Object at(int index = -1)
