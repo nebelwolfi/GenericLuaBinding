@@ -2,6 +2,7 @@
 #include "Stack.h"
 
 namespace LuaBinding {
+    class Environment;
     class ObjectRef;
     template<typename T>
     class TableIter
@@ -33,6 +34,16 @@ namespace LuaBinding {
         const char* tostring()
         {
             return lua_tostring(L, idx);
+        }
+
+        const char* tolstring()
+        {
+            lua_getglobal(L, "tostring");
+            push();
+            LuaBinding::pcall(L, 1, 1);
+            auto result = lua_tostring(L, -1);
+            lua_pop(L, 1);
+            return result;
         }
 
         template<typename T>
@@ -116,7 +127,7 @@ namespace LuaBinding {
             this->idx = LUA_REFNIL;
         }
 
-        template<typename R, bool C = false, typename ...Params>
+        template<typename R, bool C = false, typename ...Params> requires (!std::is_same_v<std::tuple_element_t<0, std::tuple<Params...>>, Environment>)
         R call(Params... param) {
             push();
             if constexpr (sizeof...(param) > 0)
@@ -140,12 +151,47 @@ namespace LuaBinding {
             }
         }
 
-        template<int R, typename ...Params>
+        template<int R, typename ...Params> requires (!std::is_same_v<std::tuple_element_t<0, std::tuple<Params...>>, Environment>)
         void call(Params... param) {
             push();
             if constexpr (sizeof...(param) > 0)
                 (void)std::initializer_list<int>{ detail::push(L, param)... };
             if (LuaBinding::pcall(L, sizeof...(param), R))
+            {
+                throw std::exception(lua_tostring(L, -1));
+            }
+        }
+
+        template<typename R, bool C = false, typename Env, typename ...Params> requires (std::is_same_v<Env, Environment>)
+        R call(Env env, Params... param) {
+            push();
+            if constexpr (sizeof...(param) > 0)
+                (void)std::initializer_list<int>{ detail::push(L, param)... };
+            if constexpr (std::is_same_v<void, R>) {
+                if (env.pcall(sizeof...(param), 0))
+                {
+                    throw std::exception(lua_tostring(L, -1));
+                }
+            } else {
+                if (env.pcall(sizeof...(param), 1))
+                {
+                    throw std::exception(lua_tostring(L, -1));
+                }
+                if constexpr(C) {
+                    auto result = LuaBinding::detail::get<R>(L, -1);
+                    lua_pop(L, 1);
+                    return result;
+                } else
+                    return LuaBinding::detail::get<R>(L, -1);
+            }
+        }
+
+        template<int R, typename Env, typename ...Params> requires (std::is_same_v<Env, Environment>)
+        void call(Env env, Params... param) {
+            push();
+            if constexpr (sizeof...(param) > 0)
+                (void)std::initializer_list<int>{ detail::push(L, param)... };
+            if (env.pcall(sizeof...(param), R))
             {
                 throw std::exception(lua_tostring(L, -1));
             }

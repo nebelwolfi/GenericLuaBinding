@@ -1,6 +1,6 @@
 #pragma once
 
-#include "lua.hpp"
+#include <lua.hpp>
 #include <type_traits>
 #include <stdexcept>
 
@@ -65,7 +65,7 @@ namespace LuaBinding {
         int errindex = lua_gettop(L) - narg;
         lua_pushcclosure(L, tack_on_traceback, 0);
         lua_insert(L, errindex);
-        auto status = lua_pcall(L, narg, nres, 0);
+        auto status = lua_pcall(L, narg, nres, errindex);
         lua_remove(L, errindex);
         return status;
     }
@@ -176,12 +176,13 @@ namespace LuaBinding {
     }
 #endif
 
-#include "LuaBinding/Object.h"
-#include "LuaBinding/Class.h"
-#include "LuaBinding/State.h"
-#include "LuaBinding/Traits.h"
-#include "LuaBinding/Stack.h"
-#include "LuaBinding/MemoryTypes.h"
+#include "Object.h"
+#include "Environment.h"
+#include "Class.h"
+#include "State.h"
+#include "Traits.h"
+#include "Stack.h"
+#include "MemoryTypes.h"
 
 namespace LuaBinding {
     static Object Nil = Object();
