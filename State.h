@@ -6,10 +6,10 @@
 #include "Stack.h"
 #include "StackIter.h"
 #include "Environment.h"
+#include "Function.h"
 #include <vector>
 #include <functional>
 #include <stdexcept>
-
 template <typename T>
 struct identity { typedef T type; };
 
@@ -119,47 +119,14 @@ namespace LuaBinding {
             return t;
         }
 
-        template <class R, class... Params>
-        void fun(R(*func)(Params...))
+        template <class F>
+        void fun(F& func)
         {
-            lua_pushlightuserdata(L, reinterpret_cast<void*>(func));
-            lua_pushcclosure(L, Traits<R, Params...>::f, 1);
+            Function::fun<void>(L, func);
         }
 
-        template <class R, class... Params>
-        void fun(const char* name, R(* func)(Params...))
-        {
-            auto str = std::string(name);
-            if (str.find('.') != std::string::npos)
-            {
-                auto enclosing_table = str.substr(0, str.find('.'));
-                auto real_class_name = str.substr(str.find('.') + 1);
-                if (!luaL_getglobal(L, enclosing_table.c_str()))
-                {
-                    lua_pop(L, 1);
-                    lua_newtable(L);
-                    lua_pushvalue(L, -1);
-                    lua_setglobal(L, enclosing_table.c_str());
-                }
-                fun(func);
-                lua_setfield(L, -2, real_class_name.c_str());
-                lua_pop(L, 1);
-            } else {
-                fun(func);
-                lua_setglobal(L, name);
-            }
-        }
-
-        template <class R, class... Params>
-        void fun(std::function<R(Params...)> func)
-        {
-            using Fun = decltype (func);
-            new (lua_newuserdatauv(L, sizeof(func), 1)) Fun(func);
-            lua_pushcclosure(L, TraitsSTDFunction<R, Params...>::f, 1);
-        }
-
-        template <class R, class... Params>
-        void fun(const char* name, std::function<R(Params...)> func)
+        template <class F>
+        void fun(const char* name, F& func)
         {
             auto str = std::string(name);
             if (str.find('.') != std::string::npos)
@@ -182,13 +149,13 @@ namespace LuaBinding {
             }
         }
 
-        template <typename F>
+        template <class F>
         void fun(F&& func)
         {
-            fun(static_cast<function_type_t<F>>(func));
+            Function::fun<void>(L, func);
         }
 
-        template <typename F>
+        template <class F>
         void fun(const char* name, F&& func)
         {
             auto str = std::string(name);
@@ -212,15 +179,14 @@ namespace LuaBinding {
             }
         }
 
-        template <class R> requires std::is_integral_v<R>
-        void cfun(R(*func)(State*))
+        template <class F>
+        void cfun(F& func)
         {
-            lua_pushlightuserdata(L, reinterpret_cast<void*>(func));
-            lua_pushcclosure(L, func, 1);
+            Function::cfun<void>(L, func);
         }
 
-        template <class R> requires std::is_integral_v<R>
-        void cfun(const char* name, R(*func)(State*))
+        template <class F>
+        void cfun(const char* name, F& func)
         {
             auto str = std::string(name);
             if (str.find('.') != std::string::npos)
@@ -243,14 +209,14 @@ namespace LuaBinding {
             }
         }
 
-        template <class R> requires std::is_integral_v<R>
-        void cfun(R(*func)(lua_State*))
+        template <class F>
+        void cfun(F&& func)
         {
-            lua_pushcclosure(L, func, 0);
+            Function::cfun<void>(L, func);
         }
 
-        template <class R> requires std::is_integral_v<R>
-        void cfun(const char* name, R(*func)(lua_State*))
+        template <class F>
+        void cfun(const char* name, F&& func)
         {
             auto str = std::string(name);
             if (str.find('.') != std::string::npos)
