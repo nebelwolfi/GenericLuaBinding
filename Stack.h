@@ -93,6 +93,18 @@ namespace LuaBinding {
         {
             return "userdata";
         }
+
+        template<class T> requires is_pushable<T>
+        int basic_type(lua_State* L)
+        {
+            return Stack<T>::basic_type(L);
+        }
+
+        template<class T> requires (!is_pushable<T>)
+        int basic_type(lua_State* L)
+        {
+            return LUA_TUSERDATA;
+        }
     }
 
     template<typename T>
@@ -110,6 +122,9 @@ namespace LuaBinding {
         }
         static const char* basic_type_name(lua_State* L) {
             return "";
+        }
+        static int basic_type(lua_State* L) {
+            return LUA_TNONE;
         }
     };
 
@@ -187,6 +202,9 @@ namespace LuaBinding {
         static const char* basic_type_name(lua_State* L) {
             return "userdata";
         }
+        static int basic_type(lua_State* L) {
+            return LUA_TUSERDATA;
+        }
         static T get(lua_State* L, int index) requires (std::is_convertible_v<T, void*>)
         {
             return *(T*)lua_touserdata(L, index);
@@ -218,6 +236,9 @@ namespace LuaBinding {
         static const char* basic_type_name(lua_State* L) {
             return "number";
         }
+        static int basic_type(lua_State* L) {
+            return LUA_TNUMBER;
+        }
     };
 
     template<>
@@ -241,6 +262,9 @@ namespace LuaBinding {
         static const char* basic_type_name(lua_State* L) {
             return "number";
         }
+        static int basic_type(lua_State* L) {
+            return LUA_TNUMBER;
+        }
     };
 
     template<>
@@ -259,6 +283,9 @@ namespace LuaBinding {
         }
         static const char* basic_type_name(lua_State* L) {
             return "nil";
+        }
+        static int basic_type(lua_State* L) {
+            return LUA_TNIL;
         }
     };
 
@@ -283,6 +310,9 @@ namespace LuaBinding {
         static const char* basic_type_name(lua_State* L) {
             return "number";
         }
+        static int basic_type(lua_State* L) {
+            return LUA_TNUMBER;
+        }
     };
 
     template<class T> requires std::is_integral_v<T>
@@ -305,6 +335,9 @@ namespace LuaBinding {
         }
         static const char* basic_type_name(lua_State* L) {
             return "number";
+        }
+        static int basic_type(lua_State* L) {
+            return LUA_TNUMBER;
         }
     };
 
@@ -329,6 +362,9 @@ namespace LuaBinding {
         static const char* basic_type_name(lua_State* L) {
             return "string";
         }
+        static int basic_type(lua_State* L) {
+            return LUA_TSTRING;
+        }
     };
 
     template<>
@@ -351,6 +387,9 @@ namespace LuaBinding {
         }
         static const char* basic_type_name(lua_State* L) {
             return "boolean";
+        }
+        static int basic_type(lua_State* L) {
+            return LUA_TBOOLEAN;
         }
     };
 
@@ -375,6 +414,9 @@ namespace LuaBinding {
         static const char* basic_type_name(lua_State* L) {
             return "string";
         }
+        static int basic_type(lua_State* L) {
+            return LUA_TSTRING;
+        }
     };
 
     template<>
@@ -398,6 +440,9 @@ namespace LuaBinding {
         static const char* basic_type_name(lua_State* L) {
             return "string";
         }
+        static int basic_type(lua_State* L) {
+            return LUA_TSTRING;
+        }
     };
 
     template<>
@@ -420,6 +465,9 @@ namespace LuaBinding {
         }
         static const char* basic_type_name(lua_State* L) {
             return "string";
+        }
+        static int basic_type(lua_State* L) {
+            return LUA_TSTRING;
         }
     };
 
@@ -462,6 +510,13 @@ namespace LuaBinding {
                 return Stack<T>::basic_type_name(L);
             }
             return StackClass<T>::basic_type_name(L);
+        }
+        static int basic_type(lua_State* L) {
+            if constexpr (detail::is_pushable<T>)
+            {
+                return Stack<T>::basic_type(L);
+            }
+            return StackClass<T>::basic_type(L);
         }
     };
 
@@ -513,6 +568,9 @@ namespace LuaBinding {
         static const char* basic_type_name(lua_State* L) {
             return "table";
         }
+        static int basic_type(lua_State* L) {
+            return LUA_TTABLE;
+        }
     };
 
     template<typename K, typename V>
@@ -556,6 +614,9 @@ namespace LuaBinding {
         }
         static const char* basic_type_name(lua_State* L) {
             return "table";
+        }
+        static int basic_type(lua_State* L) {
+            return LUA_TTABLE;
         }
     };
 
@@ -602,6 +663,9 @@ namespace LuaBinding {
         static const char* basic_type_name(lua_State* L) {
             return "table";
         }
+        static int basic_type(lua_State* L) {
+            return LUA_TTABLE;
+        }
     };
 
     template <class T, size_t size>
@@ -644,6 +708,9 @@ namespace LuaBinding {
         }
         static const char* basic_type_name(lua_State* L) {
             return "table";
+        }
+        static int basic_type(lua_State* L) {
+            return LUA_TTABLE;
         }
     };
 
@@ -694,6 +761,9 @@ namespace LuaBinding {
         static const char* basic_type_name(lua_State* L) {
             return "table";
         }
+        static int basic_type(lua_State* L) {
+            return LUA_TTABLE;
+        }
     };
 
     template<typename K, typename V>
@@ -742,6 +812,9 @@ namespace LuaBinding {
         }
         static const char* basic_type_name(lua_State* L) {
             return "table";
+        }
+        static int basic_type(lua_State* L) {
+            return LUA_TTABLE;
         }
     };
 }

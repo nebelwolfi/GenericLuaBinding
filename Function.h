@@ -276,7 +276,7 @@ namespace LuaBinding {
         {
             if constexpr(!std::is_same_v<State, std::decay_t<disect_function<F>::template arg<0>::type>>)
             {
-                lua_pushstring(L, detail::basic_type_name<std::decay_t<disect_function<F>::template arg<0>::type>>(L));
+                lua_pushinteger(L, detail::basic_type<std::decay_t<disect_function<F>::template arg<0>::type>>(L));
                 lua_rawseti(L, -2, J + (disect_function<F>::isClass ? 1 : 0));
                 LoopTupleT<F, 1, J + 1>(L);
             } else
@@ -284,7 +284,7 @@ namespace LuaBinding {
         } else if constexpr(N < disect_function<F>::nargs) {
             if constexpr(!std::is_same_v<State, std::decay_t<disect_function<F>::template arg<0>::type>>)
             {
-                lua_pushstring(L, detail::basic_type_name<std::decay_t<disect_function<F>::template arg<N-1>::type>>(L));
+                lua_pushinteger(L, detail::basic_type<std::decay_t<disect_function<F>::template arg<N-1>::type>>(L));
                 lua_rawseti(L, -2, J + (disect_function<F>::isClass ? 1 : 0));
                 LoopTupleT<F, N + 1, J + 1>(L);
             } else
@@ -305,7 +305,7 @@ namespace LuaBinding {
 
                 lua_newtable(L);
                 if constexpr(disect_function<decltype(f)>::isClass) {
-                    lua_pushstring(L, "userdata");
+                    lua_pushinteger(L, LUA_TUSERDATA);
                     lua_rawseti(L, -2, 1);
                 }
 
@@ -350,7 +350,7 @@ namespace LuaBinding {
                 lua_getfield(L, -1, "argl");
                 lua_pushnil(L);
                 while(lua_next(L, -2) != 0) {
-                    if (strcmp(lua_tostring(L, -1), lua_typename(L, lua_type(L, lua_tointeger(L, -2)))))
+                    if (lua_tointeger(L, -1) != lua_type(L, lua_tointeger(L, -2)))
                         valid = false;
                     lua_pop(L, 1);
                 }
@@ -366,7 +366,6 @@ namespace LuaBinding {
                 lua_pop(L, 1);
             }
 
-            StackDump(L);
             luaL_error(L, "no matching overload with %d args of type %s", argn, lua_typename(L, lua_type(L, 1)));
 
             return 0;
