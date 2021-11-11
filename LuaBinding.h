@@ -6,7 +6,7 @@
 
 namespace LuaBinding {
 
-    namespace detail {
+    namespace ResolveDetail {
         namespace _resolve {
             template <typename Sig, typename C>
             inline Sig C::* resolve_v(std::false_type, Sig C::* mem_func_ptr) {
@@ -18,27 +18,28 @@ namespace LuaBinding {
                 return mem_variable_ptr;
             }
         } // namespace detail
-
-        template <typename... Args, typename R>
-        inline auto resolve(R fun_ptr(Args...))->R(*)(Args...) {
-            return fun_ptr;
-        }
-
-        template <typename Sig>
-        inline Sig* resolve(Sig* fun_ptr) {
-            return fun_ptr;
-        }
-
-        template <typename... Args, typename R, typename C>
-        inline auto resolve(R(C::* mem_ptr)(Args...))->R(C::*)(Args...) {
-            return mem_ptr;
-        }
-
-        template <typename Sig, typename C>
-        inline Sig C::* resolve(Sig C::* mem_ptr) {
-            return _resolve::resolve_v(std::is_member_object_pointer<Sig C::*>(), mem_ptr);
-        }
     }
+
+    template <typename... Args, typename R>
+    inline auto resolve(R fun_ptr(Args...))->R(*)(Args...) {
+        return fun_ptr;
+    }
+
+    template <typename Sig>
+    inline Sig* resolve(Sig* fun_ptr) {
+        return fun_ptr;
+    }
+
+    template <typename... Args, typename R, typename C>
+    inline auto resolve(R(C::* mem_ptr)(Args...))->R(C::*)(Args...) {
+        return mem_ptr;
+    }
+
+    template <typename Sig, typename C>
+    inline Sig C::* resolve(Sig C::* mem_ptr) {
+        return ResolveDetail::_resolve::resolve_v(std::is_member_object_pointer<Sig C::*>(), mem_ptr);
+    }
+
     static int lua_openlib_mt(lua_State* L, const char* name, luaL_Reg* funcs, lua_CFunction indexer)
     {
         lua_newtable(L);                            // +1 | 0 | 1
@@ -178,11 +179,12 @@ namespace LuaBinding {
 
 #include "Object.h"
 #include "Environment.h"
-#include "Class.h"
 #include "State.h"
 #include "Traits.h"
 #include "Stack.h"
+#include "Class.h"
 #include "MemoryTypes.h"
+#include "Function.h"
 
 namespace LuaBinding {
     static Object Nil = Object();

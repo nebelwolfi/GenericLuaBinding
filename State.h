@@ -1,9 +1,9 @@
 #pragma once
 
-#include "Class.h"
 #include "DynClass.h"
 #include "Object.h"
 #include "Stack.h"
+#include "Class.h"
 #include "StackIter.h"
 #include "Environment.h"
 #include "Function.h"
@@ -19,6 +19,8 @@ namespace LuaBinding {
     class Class;
     class DynClass;
     class Object;
+    template<typename ...Functions>
+    class OverloadedFunction;
 
     template< class T >
     inline constexpr bool is_state_v = std::is_same<T, State*>::value;
@@ -237,6 +239,12 @@ namespace LuaBinding {
                 cfun(func);
                 lua_setglobal(L, name);
             }
+        }
+
+        template<typename ...Funcs>
+        void overload(const char* name, Funcs... functions) {
+            OverloadedFunction(L, functions...);
+            lua_setglobal(L, name);
         }
 
         int exec(const char* code, int argn = 0, int nres = 0)
