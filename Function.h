@@ -366,7 +366,7 @@ namespace LuaBinding {
                 lua_pop(L, 1);
             }
 
-            luaL_error(L, "no matching overload with %d args of type %s", argn, lua_typename(L, lua_type(L, 1)));
+            luaL_error(L, "no matching overload with %d args and input values", argn);
 
             return 0;
         }
