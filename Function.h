@@ -254,18 +254,26 @@ namespace LuaBinding {
         };
     };
 
-    template <typename F, size_t N = 0>
+    template <typename F, size_t N = 0, size_t J = 1>
     void LoopTupleT(lua_State *L)
     {
         if constexpr (N == 0)
         {
-            lua_pushstring(L, detail::basic_type_name<std::decay_t<disect_function<F>::template arg<0>::type>>(L));
-            lua_rawseti(L, -2, 1);
-            LoopTupleT<F, 1>(L);
+            if constexpr(!std::is_same_v<State, std::decay_t<disect_function<F>::template arg<0>::type>>)
+            {
+                lua_pushstring(L, detail::basic_type_name<std::decay_t<disect_function<F>::template arg<0>::type>>(L));
+                lua_rawseti(L, -2, J);
+                LoopTupleT<F, 1, J + 1>(L);
+            } else
+                LoopTupleT<F, 1, J>(L);
         } else if constexpr(N < disect_function<F>::nargs) {
-            lua_pushstring(L, detail::basic_type_name<std::decay_t<disect_function<F>::template arg<N-1>::type>>(L));
-            lua_rawseti(L, -2, N + 1);
-            LoopTupleT<F, N + 1>(L);
+            if constexpr(!std::is_same_v<State, std::decay_t<disect_function<F>::template arg<0>::type>>)
+            {
+                lua_pushstring(L, detail::basic_type_name<std::decay_t<disect_function<F>::template arg<N-1>::type>>(L));
+                lua_rawseti(L, -2, J);
+                LoopTupleT<F, N + 1, J + 1>(L);
+            } else
+                LoopTupleT<F, N + 1, J>(L);
         }
     }
 
