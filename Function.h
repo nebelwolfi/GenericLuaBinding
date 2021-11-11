@@ -277,7 +277,7 @@ namespace LuaBinding {
             if constexpr(!std::is_same_v<State, std::decay_t<disect_function<F>::template arg<0>::type>>)
             {
                 lua_pushstring(L, detail::basic_type_name<std::decay_t<disect_function<F>::template arg<0>::type>>(L));
-                lua_rawseti(L, -2, J + disect_function<F>::isClass);
+                lua_rawseti(L, -2, J + (disect_function<F>::isClass ? 1 : 0));
                 LoopTupleT<F, 1, J + 1>(L);
             } else
                 LoopTupleT<F, 1, J>(L);
@@ -285,7 +285,7 @@ namespace LuaBinding {
             if constexpr(!std::is_same_v<State, std::decay_t<disect_function<F>::template arg<0>::type>>)
             {
                 lua_pushstring(L, detail::basic_type_name<std::decay_t<disect_function<F>::template arg<N-1>::type>>(L));
-                lua_rawseti(L, -2, J + disect_function<F>::isClass);
+                lua_rawseti(L, -2, J + (disect_function<F>::isClass ? 1 : 0));
                 LoopTupleT<F, N + 1, J + 1>(L);
             } else
                 LoopTupleT<F, N + 1, J>(L);
@@ -304,12 +304,12 @@ namespace LuaBinding {
                 lua_newtable(L);
 
                 lua_newtable(L);
-                if constexpr( disect_function<decltype(f)>::isClass) {
+                if constexpr(disect_function<decltype(f)>::isClass) {
                     lua_pushstring(L, "userdata");
                     lua_rawseti(L, -2, 1);
                 }
 
-                if constexpr( disect_function<decltype(f)>::nargs)
+                if constexpr(disect_function<decltype(f)>::nargs > 0)
                     LoopTupleT<decltype(f)>(L);
 
                 lua_pushinteger(L, lua_objlen(L, -1));
