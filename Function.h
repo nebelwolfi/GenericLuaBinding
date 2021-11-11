@@ -70,7 +70,7 @@ namespace LuaBinding {
         template <class T, class F>
         void fun(lua_State *L, F&& func)
         {
-            fun<T>(static_cast<function_type_t<std::decay_t<F>>>(func));
+            fun<T>(L, static_cast<function_type_t<std::decay_t<F>>>(func));
         }
 
         template <class T, class R> requires std::is_integral_v<R>
