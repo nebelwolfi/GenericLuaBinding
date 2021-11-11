@@ -145,7 +145,7 @@ namespace LuaBinding {
         template <class T, class F>
         void cfun(lua_State *L, F&& func)
         {
-            cfun(static_cast<function_type_t<std::decay_t<F>>>(func));
+            cfun(L, static_cast<function_type_t<std::decay_t<F>>>(func));
         }
     }
 

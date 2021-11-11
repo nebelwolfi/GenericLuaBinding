@@ -265,6 +265,24 @@ namespace LuaBinding {
             return lua_gettop(L);
         }
 
+        int exec(std::vector<char>& code, int argn = 0, int nres = 0, const char* name = "=")
+        {
+            if (luaL_loadbuffer(L, code.data(), code.size(), name) || LuaBinding::pcall(L, argn, nres))
+            {
+                throw std::exception(lua_tostring(L, -1));
+            }
+            return lua_gettop(L);
+        }
+
+        int exec(Environment env, std::vector<char>& code, int argn = 0, int nres = 0, const char* name = "=")
+        {
+            if (luaL_loadbuffer(L, code.data(), code.size(), name) || env.pcall(argn, nres))
+            {
+                throw std::exception(lua_tostring(L, -1));
+            }
+            return lua_gettop(L);
+        }
+
         int n() {
             return lua_gettop(L);
         }
