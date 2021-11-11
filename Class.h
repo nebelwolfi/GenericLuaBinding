@@ -23,6 +23,9 @@ namespace LuaBinding {
         }
     };
 
+    template<typename C, typename ...Functions>
+    class OverloadedFunction;
+
     template<typename T>
     class Class {
         lua_State* L = nullptr;
@@ -346,6 +349,15 @@ namespace LuaBinding {
                 push_metatable();
                 lua_setglobal(L, class_name);
             } else lua_pop(L, 1);
+            return *this;
+        }
+
+        template<typename ...Funcs>
+        Class<T>& overload(const char* name, Funcs... functions) {
+            push_function_index();
+            OverloadedFunction<T, Funcs...>(L, functions...);
+            lua_setfield(L, -2, name);
+            lua_pop(L, 1);
             return *this;
         }
 

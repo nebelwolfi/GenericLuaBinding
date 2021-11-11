@@ -234,6 +234,20 @@ namespace LuaBinding {
     struct disect_function<R(*)(Args...)>
     {
         static const size_t nargs = sizeof...(Args);
+        static const bool isClass = false;
+
+        template <size_t i>
+        struct arg
+        {
+            typedef typename std::tuple_element<i, std::tuple<Args...>>::type type;
+        };
+    };
+
+    template<typename R, typename T, typename ...Args>
+    struct disect_function<R(T::*)(Args...)>
+    {
+        static const size_t nargs = sizeof...(Args);
+        static const bool isClass = true;
 
         template <size_t i>
         struct arg
@@ -246,6 +260,7 @@ namespace LuaBinding {
     struct disect_function<std::function<R(Args...)>>
     {
         static const size_t nargs = sizeof...(Args);
+        static const bool isClass = false;
 
         template <size_t i>
         struct arg
@@ -262,7 +277,7 @@ namespace LuaBinding {
             if constexpr(!std::is_same_v<State, std::decay_t<disect_function<F>::template arg<0>::type>>)
             {
                 lua_pushstring(L, detail::basic_type_name<std::decay_t<disect_function<F>::template arg<0>::type>>(L));
-                lua_rawseti(L, -2, J);
+                lua_rawseti(L, -2, J + disect_function<F>::isClass);
                 LoopTupleT<F, 1, J + 1>(L);
             } else
                 LoopTupleT<F, 1, J>(L);
@@ -270,32 +285,39 @@ namespace LuaBinding {
             if constexpr(!std::is_same_v<State, std::decay_t<disect_function<F>::template arg<0>::type>>)
             {
                 lua_pushstring(L, detail::basic_type_name<std::decay_t<disect_function<F>::template arg<N-1>::type>>(L));
-                lua_rawseti(L, -2, J);
+                lua_rawseti(L, -2, J + disect_function<F>::isClass);
                 LoopTupleT<F, N + 1, J + 1>(L);
             } else
                 LoopTupleT<F, N + 1, J>(L);
         }
     }
 
-    template<typename ...Functions>
+    template<typename C, typename ...Functions>
     class OverloadedFunction {
         lua_State* L = nullptr;
     public:
-        OverloadedFunction(lua_State *L, Functions... functions) : L(L) {
+        OverloadedFunction(lua_State *L, Functions... functions) {
+            this->L = L;
             lua_newtable(L);
             auto fun_index = 1;
             auto push_fun = [&fun_index](lua_State* L, auto f) {
                 lua_newtable(L);
 
                 lua_newtable(L);
-                LoopTupleT<decltype(f)>(L);
+                if constexpr( disect_function<decltype(f)>::isClass) {
+                    lua_pushstring(L, "userdata");
+                    lua_rawseti(L, -2, 1);
+                }
+
+                if constexpr( disect_function<decltype(f)>::nargs)
+                    LoopTupleT<decltype(f)>(L);
 
                 lua_pushinteger(L, lua_objlen(L, -1));
                 lua_setfield(L, -3, "nargs");
 
                 lua_setfield(L, -2, "argl");
 
-                Function::fun<void>(L, f);
+                Function::fun<C>(L, f);
                 lua_setfield(L, -2, "f");
 
                 lua_pushstring(L, typeid(f).name());
@@ -339,14 +361,12 @@ namespace LuaBinding {
                     lua_insert(L, 1);
                     lua_pop(L, 3);
                     return LuaBinding::pcall(L, argn, LUA_MULTRET);
-                } else {
-                    StackDump(L);
-                    printf("invalid %d \n", lua_tointeger(L, -2));
                 }
 
                 lua_pop(L, 1);
             }
 
+            StackDump(L);
             luaL_error(L, "no matching overload with %d args of type %s", argn, lua_typename(L, lua_type(L, 1)));
 
             return 0;

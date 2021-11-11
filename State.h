@@ -19,7 +19,7 @@ namespace LuaBinding {
     class Class;
     class DynClass;
     class Object;
-    template<typename ...Functions>
+    template<typename C, typename ...Functions>
     class OverloadedFunction;
 
     template< class T >
@@ -243,7 +243,7 @@ namespace LuaBinding {
 
         template<typename ...Funcs>
         void overload(const char* name, Funcs... functions) {
-            OverloadedFunction(L, functions...);
+            OverloadedFunction<void, Funcs...>(L, functions...);
             lua_setglobal(L, name);
         }
 
