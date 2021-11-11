@@ -401,7 +401,7 @@ namespace LuaBinding {
         {
             prop_fun(name, std::forward<F>(func));
             push_metatable();
-            lua_pushstring(L, "__cvalid");
+            lua_pushstring(L, "__valid");
             push_property_index();
             lua_pushstring(L, name);
             lua_rawget(L, -2);
@@ -416,7 +416,7 @@ namespace LuaBinding {
         {
             prop_cfun(name, std::forward<F>(func));
             push_metatable();
-            lua_pushstring(L, "__cvalid");
+            lua_pushstring(L, "__valid");
             push_property_index();
             lua_pushstring(L, name);
             lua_rawget(L, -2);
