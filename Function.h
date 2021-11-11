@@ -178,6 +178,19 @@ namespace LuaBinding {
         };
     };
 
+    template<typename R, typename T, typename ...Args>
+    struct disect_function<R(T::*)(Args...) const>
+    {
+        static const size_t nargs = sizeof...(Args);
+        static const bool isClass = true;
+
+        template <size_t i>
+        struct arg
+        {
+            typedef typename std::tuple_element<i, std::tuple<Args...>>::type type;
+        };
+    };
+
     template<typename R, typename ...Args>
     struct disect_function<std::function<R(Args...)>>
     {
