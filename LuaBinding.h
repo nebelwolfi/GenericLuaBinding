@@ -187,7 +187,8 @@ namespace LuaBinding {
                         printfun("%s[%d] = {\n", tabs, lua_tointeger(L, -2));
                     else
                         printfun("%s[%s] = {\n", tabs, lua_tostring(L, -2));
-                    TableDump(L, -1, printfun, (std::string(tabs) + "\t").c_str());
+                    if (strlen(tabs) < 4)
+                        TableDump(L, -1, printfun, (std::string(tabs) + "\t").c_str());
                     printfun("%s}\n", tabs);
                     break;
                 case LUA_TSTRING:  /* strings */

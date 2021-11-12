@@ -1,5 +1,7 @@
 #pragma once
+#include "Object.h"
 #include "Stack.h"
+#include <functional>
 #include <tuple>
 
 namespace LuaBinding {
@@ -153,10 +155,36 @@ namespace LuaBinding {
     struct disect_function;
 
     template<typename R, typename ...Args>
+    struct disect_function<R(Args...)>
+    {
+        static constexpr size_t nargs = sizeof...(Args);
+        static constexpr bool isClass = false;
+
+        template <size_t i>
+        struct arg
+        {
+            typedef typename std::tuple_element<i, std::tuple<Args...>>::type type;
+        };
+    };
+
+    template<typename R, typename ...Args>
+    struct disect_function<R(Args...) const>
+    {
+        static constexpr size_t nargs = sizeof...(Args);
+        static constexpr bool isClass = false;
+
+        template <size_t i>
+        struct arg
+        {
+            typedef typename std::tuple_element<i, std::tuple<Args...>>::type type;
+        };
+    };
+
+    template<typename R, typename ...Args>
     struct disect_function<R(*)(Args...)>
     {
-        static const size_t nargs = sizeof...(Args);
-        static const bool isClass = false;
+        static constexpr size_t nargs = sizeof...(Args);
+        static constexpr bool isClass = false;
 
         template <size_t i>
         struct arg
@@ -168,8 +196,9 @@ namespace LuaBinding {
     template<typename R, typename T, typename ...Args>
     struct disect_function<R(T::*)(Args...)>
     {
-        static const size_t nargs = sizeof...(Args);
-        static const bool isClass = true;
+        static constexpr size_t nargs = sizeof...(Args);
+        static constexpr bool isClass = true;
+        static constexpr T* classT = nullptr;
 
         template <size_t i>
         struct arg
@@ -181,8 +210,9 @@ namespace LuaBinding {
     template<typename R, typename T, typename ...Args>
     struct disect_function<R(T::*)(Args...) const>
     {
-        static const size_t nargs = sizeof...(Args);
-        static const bool isClass = true;
+        static constexpr size_t nargs = sizeof...(Args);
+        static constexpr bool isClass = true;
+        static constexpr T* classT = nullptr;
 
         template <size_t i>
         struct arg
@@ -194,8 +224,8 @@ namespace LuaBinding {
     template<typename R, typename ...Args>
     struct disect_function<std::function<R(Args...)>>
     {
-        static const size_t nargs = sizeof...(Args);
-        static const bool isClass = false;
+        static constexpr size_t nargs = sizeof...(Args);
+        static constexpr bool isClass = false;
 
         template <size_t i>
         struct arg
@@ -316,4 +346,46 @@ namespace LuaBinding {
             return 0;
         }
     };
+
+    namespace detail {
+        template<class T>
+        int fun(lua_State* L, T& t)
+        {
+            if constexpr(disect_function<T>::isClass)
+                Function::fun<decltype(disect_function<T>::classT)>(L, t);
+            else
+                Function::fun<void>(L, t);
+            return 1;
+        }
+
+        template<class T>
+        int fun(lua_State* L, T&& t)
+        {
+            if constexpr(disect_function<T>::isClass)
+                Function::fun<decltype(disect_function<T>::classT)>(L, t);
+            else
+                Function::fun<void>(L, t);
+            return 1;
+        }
+
+        template<class T>
+        int cfun(lua_State* L, T& t)
+        {
+            if constexpr(disect_function<T>::isClass)
+                Function::cfun<decltype(*disect_function<T>::classT)>(L, t);
+            else
+                Function::cfun<void>(L, t);
+            return 1;
+        }
+
+        template<class T>
+        int cfun(lua_State* L, T&& t)
+        {
+            if constexpr(disect_function<T>::isClass)
+                Function::cfun<decltype(*disect_function<T>::classT)>(L, t);
+            else
+                Function::cfun<void>(L, t);
+            return 1;
+        }
+    }
 }

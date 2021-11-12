@@ -4,6 +4,7 @@
 #include <optional>
 #include <vector>
 #include <unordered_map>
+#include "Object.h"
 
 namespace LuaBinding {
     template<typename T>
@@ -44,6 +45,18 @@ namespace LuaBinding {
             lua_remove(L, index);
             return r;
         }
+
+        template<class T>
+        int fun(lua_State* L, T& t);
+
+        template<class T>
+        int fun(lua_State* L, T&& t);
+
+        template<class T>
+        int cfun(lua_State* L, T& t);
+
+        template<class T>
+        int cfun(lua_State* L, T&& t);
 
         template<class T> requires is_pushable<T>
         int push(lua_State* L, T&& t)

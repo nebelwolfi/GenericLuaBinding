@@ -1,5 +1,4 @@
 #pragma once
-#include "Object.h"
 
 namespace LuaBinding {
     class Environment : public ObjectRef {
@@ -39,7 +38,7 @@ namespace LuaBinding {
         explicit Environment(lua_State* L, bool)
         {
             this->L = L;
-            lua_rawgeti(L, LUA_ENVIRONINDEX, 1);
+            lua_getfenv(L, lua_upvalueindex(1));
             this->idx = luaL_ref(L, LUA_REGISTRYINDEX);
         }
         int pcall(int narg = 0, int nres = 0) {

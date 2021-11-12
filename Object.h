@@ -216,6 +216,42 @@ namespace LuaBinding {
             lua_pop(L, 1);
         }
 
+        template <typename T>
+        void fun(const char* index, T& other)
+        {
+            push();
+            detail::fun(L, other);
+            lua_setfield(L, -2, index);
+            lua_pop(L, 1);
+        }
+
+        template <typename T>
+        void fun(const char* index, T&& other)
+        {
+            push();
+            detail::fun(L, other);
+            lua_setfield(L, -2, index);
+            lua_pop(L, 1);
+        }
+
+        template <typename T>
+        void cfun(const char* index, T& other)
+        {
+            push();
+            detail::cfun(L, other);
+            lua_setfield(L, -2, index);
+            lua_pop(L, 1);
+        }
+
+        template <typename T>
+        void cfun(const char* index, T&& other)
+        {
+            push();
+            detail::cfun(L, other);
+            lua_setfield(L, -2, index);
+            lua_pop(L, 1);
+        }
+
         [[nodiscard]] int index() const
         {
             return idx;
@@ -436,6 +472,12 @@ namespace LuaBinding {
         {
             return Object(L, index);
         }
+        static const char* basic_type_name(lua_State* L) {
+            return "object";
+        }
+        static int basic_type(lua_State* L) {
+            return -2;
+        }
     };
 
     template<>
@@ -443,18 +485,17 @@ namespace LuaBinding {
     public:
         static int push(lua_State* L, Object* t)
         {
-            if (t)
-                t->push();
-            else
-                lua_pushnil(L);
-            return 1;
+            static_assert(true, "Use ObjectRef or ObjectRef& instead of ObjectRef*");
+            return 0;
         }
         static bool is(lua_State* L, int index) {
-            return true;
+            static_assert(true, "Use ObjectRef or ObjectRef& instead of ObjectRef*");
+            return false;
         }
         static Object* get(lua_State* L, int index)
         {
-            return new Object(L, index);
+            static_assert(true, "Use ObjectRef or ObjectRef& instead of ObjectRef*");
+            return nullptr;
         }
     };
 
@@ -470,7 +511,13 @@ namespace LuaBinding {
         }
         static ObjectRef get(lua_State* L, int index)
         {
-            return ObjectRef(L, index, true);
+            return {L, index, true};
+        }
+        static const char* basic_type_name(lua_State* L) {
+            return "object";
+        }
+        static int basic_type(lua_State* L) {
+            return -2;
         }
     };
 
@@ -479,18 +526,17 @@ namespace LuaBinding {
     public:
         static int push(lua_State* L, ObjectRef* t)
         {
-            if (t)
-                t->push();
-            else
-                lua_pushnil(L);
-            return 1;
+            static_assert(true, "Use ObjectRef or ObjectRef& instead of ObjectRef*");
+            return 0;
         }
         static bool is(lua_State* L, int index) {
-            return true;
+            static_assert(true, "Use ObjectRef or ObjectRef& instead of ObjectRef*");
+            return false;
         }
         static ObjectRef* get(lua_State* L, int index)
         {
-            return new ObjectRef(L, index, true);
+            static_assert(true, "Use ObjectRef or ObjectRef& instead of ObjectRef*");
+            return nullptr;
         }
     };
 }

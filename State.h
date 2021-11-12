@@ -8,7 +8,6 @@
 #include "Environment.h"
 #include "Function.h"
 #include <vector>
-#include <functional>
 #include <stdexcept>
 template <typename T>
 struct identity { typedef T type; };
