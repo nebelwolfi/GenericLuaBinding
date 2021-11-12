@@ -203,7 +203,7 @@ namespace LuaBinding {
             push();
             detail::push(L, other);
             lua_setfield(L, -2, index);
-            pop();
+            lua_pop(L, 1);
         }
 
         template <typename T>
@@ -213,7 +213,7 @@ namespace LuaBinding {
             lua_pushinteger(L, index);
             detail::push(L, other);
             lua_settable(L, -3);
-            pop();
+            lua_pop(L, 1);
         }
 
         [[nodiscard]] int index() const
