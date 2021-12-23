@@ -47,6 +47,7 @@ namespace LuaBinding {
             lua_pushlightuserdata(L, new std::vector<DynClass*>());
             lua_setfield(L, -2, "dynamic_class_store");
             lua_setglobal(L, "__DATASTORE");
+
         }
         State(lua_State*L) : L(L), view(true) {
         }
