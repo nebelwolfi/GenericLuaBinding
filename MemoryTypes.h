@@ -20,6 +20,7 @@ namespace LuaBinding {
         vector = -0x40000,
         point = -0x100000,
         udata = -0x200000,
+
         stdstring = -0x400000,
         stringptr = -0x800000,
     };

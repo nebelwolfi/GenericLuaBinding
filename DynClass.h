@@ -16,11 +16,6 @@ namespace LuaBinding {
             lua_pushcclosure(L, lua_CGCFunction, 0);
             lua_setfield(L, -2, "__gc");
 
-            lua_newtable(L);
-            lua_pushcclosure(L, lua_CGCProtector, 0);
-            lua_setfield(L, -2, "__newindex");
-            lua_setmetatable(L, -2);
-
             lua_pushcclosure(L, lua_CIndexFunction, 0);
             lua_setfield(L, -2, "__index");
 
@@ -92,25 +87,15 @@ namespace LuaBinding {
                 pcall(S, 1, 0);
             }
             auto u = (void**)lua_touserdata(S, 1);
-            if (*(u + 1) == (void*)0xC0FFEE)
-            {
+            if (*(u + 1) == (void*)0xC0FFEE) {
                 free(*u);
             }
             return 0;
         }
-        static int lua_CGCProtector(lua_State* S) {
-            if (strcmp(lua_tostring(S, 2), "__gc") == 0)
-            {
-                lua_remove(S, 2);
-                lua_pushstring(S, "__cgc");
-                lua_insert(S, 2);
-            }
-            lua_rawset(S, 1);
-            return 0;
-        }
         static int lua_EQFunction(lua_State* S)
         {
-            if (!lua_isuserdata(S, 1) || !lua_isuserdata(S, 2)) lua_pushboolean(S, false);
+            if (!lua_isuserdata(S, 1) || !lua_isuserdata(S, 2))
+                lua_pushboolean(S, false);
             else
                 lua_pushboolean(S, *(uint32_t*)lua_touserdata(S, 1) == *(uint32_t*)lua_touserdata(S, 2));
             return 1;
@@ -413,6 +398,7 @@ namespace LuaBinding {
             auto size = lua_isinteger(L, 2) ? lua_tointeger(L, 2) : c->get_size();
 
             auto udata = (void*)malloc(size);
+            memset(udata, 0, size);
             auto u = (void**)lua_newuserdata(L, sizeof(void*) * 2);
             *u = udata; *(u + 1) = (void*)0xC0FFEE;
 

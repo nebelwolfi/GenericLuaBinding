@@ -2,6 +2,7 @@
 #include "Stack.h"
 
 namespace LuaBinding {
+    class Environment;
     class ObjectRef;
     template<typename T>
     class TableIter
@@ -33,6 +34,16 @@ namespace LuaBinding {
         const char* tostring()
         {
             return lua_tostring(L, idx);
+        }
+
+        const char* tolstring()
+        {
+            lua_getglobal(L, "tostring");
+            push();
+            LuaBinding::pcall(L, 1, 1);
+            auto result = lua_tostring(L, -1);
+            lua_pop(L, 1);
+            return result;
         }
 
         template<typename T>
@@ -116,7 +127,7 @@ namespace LuaBinding {
             this->idx = LUA_REFNIL;
         }
 
-        template<typename R, bool C = false, typename ...Params>
+        template<typename R, bool C = false, typename ...Params> requires (!std::is_same_v<std::tuple_element_t<0, std::tuple<Params...>>, Environment>)
         R call(Params... param) {
             push();
             if constexpr (sizeof...(param) > 0)
@@ -140,12 +151,47 @@ namespace LuaBinding {
             }
         }
 
-        template<int R, typename ...Params>
+        template<int R, typename ...Params> requires (!std::is_same_v<std::tuple_element_t<0, std::tuple<Params...>>, Environment>)
         void call(Params... param) {
             push();
             if constexpr (sizeof...(param) > 0)
                 (void)std::initializer_list<int>{ detail::push(L, param)... };
             if (LuaBinding::pcall(L, sizeof...(param), R))
+            {
+                throw std::exception(lua_tostring(L, -1));
+            }
+        }
+
+        template<typename R, bool C = false, typename Env, typename ...Params> requires (std::is_same_v<Env, Environment>)
+        R call(Env env, Params... param) {
+            push();
+            if constexpr (sizeof...(param) > 0)
+                (void)std::initializer_list<int>{ detail::push(L, param)... };
+            if constexpr (std::is_same_v<void, R>) {
+                if (env.pcall(sizeof...(param), 0))
+                {
+                    throw std::exception(lua_tostring(L, -1));
+                }
+            } else {
+                if (env.pcall(sizeof...(param), 1))
+                {
+                    throw std::exception(lua_tostring(L, -1));
+                }
+                if constexpr(C) {
+                    auto result = LuaBinding::detail::get<R>(L, -1);
+                    lua_pop(L, 1);
+                    return result;
+                } else
+                    return LuaBinding::detail::get<R>(L, -1);
+            }
+        }
+
+        template<int R, typename Env, typename ...Params> requires (std::is_same_v<Env, Environment>)
+        void call(Env env, Params... param) {
+            push();
+            if constexpr (sizeof...(param) > 0)
+                (void)std::initializer_list<int>{ detail::push(L, param)... };
+            if (env.pcall(sizeof...(param), R))
             {
                 throw std::exception(lua_tostring(L, -1));
             }
@@ -157,7 +203,7 @@ namespace LuaBinding {
             push();
             detail::push(L, other);
             lua_setfield(L, -2, index);
-            pop();
+            lua_pop(L, 1);
         }
 
         template <typename T>
@@ -167,7 +213,43 @@ namespace LuaBinding {
             lua_pushinteger(L, index);
             detail::push(L, other);
             lua_settable(L, -3);
-            pop();
+            lua_pop(L, 1);
+        }
+
+        template <typename T>
+        void fun(const char* index, T& other)
+        {
+            push();
+            detail::fun(L, other);
+            lua_setfield(L, -2, index);
+            lua_pop(L, 1);
+        }
+
+        template <typename T>
+        void fun(const char* index, T&& other)
+        {
+            push();
+            detail::fun(L, other);
+            lua_setfield(L, -2, index);
+            lua_pop(L, 1);
+        }
+
+        template <typename T>
+        void cfun(const char* index, T& other)
+        {
+            push();
+            detail::cfun(L, other);
+            lua_setfield(L, -2, index);
+            lua_pop(L, 1);
+        }
+
+        template <typename T>
+        void cfun(const char* index, T&& other)
+        {
+            push();
+            detail::cfun(L, other);
+            lua_setfield(L, -2, index);
+            lua_pop(L, 1);
         }
 
         [[nodiscard]] int index() const
@@ -390,6 +472,12 @@ namespace LuaBinding {
         {
             return Object(L, index);
         }
+        static const char* basic_type_name(lua_State* L) {
+            return "object";
+        }
+        static int basic_type(lua_State* L) {
+            return -2;
+        }
     };
 
     template<>
@@ -397,18 +485,17 @@ namespace LuaBinding {
     public:
         static int push(lua_State* L, Object* t)
         {
-            if (t)
-                t->push();
-            else
-                lua_pushnil(L);
-            return 1;
+            static_assert(true, "Use ObjectRef or ObjectRef& instead of ObjectRef*");
+            return 0;
         }
         static bool is(lua_State* L, int index) {
-            return true;
+            static_assert(true, "Use ObjectRef or ObjectRef& instead of ObjectRef*");
+            return false;
         }
         static Object* get(lua_State* L, int index)
         {
-            return new Object(L, index);
+            static_assert(true, "Use ObjectRef or ObjectRef& instead of ObjectRef*");
+            return nullptr;
         }
     };
 
@@ -424,7 +511,13 @@ namespace LuaBinding {
         }
         static ObjectRef get(lua_State* L, int index)
         {
-            return ObjectRef(L, index, true);
+            return {L, index, true};
+        }
+        static const char* basic_type_name(lua_State* L) {
+            return "object";
+        }
+        static int basic_type(lua_State* L) {
+            return -2;
         }
     };
 
@@ -433,18 +526,17 @@ namespace LuaBinding {
     public:
         static int push(lua_State* L, ObjectRef* t)
         {
-            if (t)
-                t->push();
-            else
-                lua_pushnil(L);
-            return 1;
+            static_assert(true, "Use ObjectRef or ObjectRef& instead of ObjectRef*");
+            return 0;
         }
         static bool is(lua_State* L, int index) {
-            return true;
+            static_assert(true, "Use ObjectRef or ObjectRef& instead of ObjectRef*");
+            return false;
         }
         static ObjectRef* get(lua_State* L, int index)
         {
-            return new ObjectRef(L, index, true);
+            static_assert(true, "Use ObjectRef or ObjectRef& instead of ObjectRef*");
+            return nullptr;
         }
     };
 }

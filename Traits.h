@@ -37,6 +37,10 @@ namespace LuaBinding {
                 std::get<I>(tup) = State(L);
                 assign_tup<I + 1>(L, tup, J - 1);
             }
+            else if constexpr (std::is_same_v<Type, Environment>) {
+                std::get<I>(tup) = Environment(L, true);
+                assign_tup<I + 1>(L, tup, J - 1);
+            }
             else if constexpr (std::is_same_v<Type, ObjectRef> && !std::is_same_v<Type, Object>) {
                 std::get<I>(tup) = ObjectRef(L, I + 1 + J);
                 assign_tup<I + 1>(L, tup, J);
@@ -91,7 +95,7 @@ namespace LuaBinding {
         using ParamList = std::tuple<std::decay_t<Params>...>;
     public:
         static int f(lua_State* L) {
-            auto fnptr = reinterpret_cast <R(*)(Params...)> (lua_touserdata(L, lua_upvalueindex(2)));
+            auto fnptr = reinterpret_cast <R(*)(Params...)> (lua_touserdata(L, lua_upvalueindex(1)));
             ParamList params;
             assign_tup(L, params);
             if constexpr (std::is_void_v<R>) {
@@ -127,7 +131,7 @@ namespace LuaBinding {
         static int f(lua_State* L) {
             ParamList params;
             assign_tup(L, params, 1);
-            auto m = (void*)new char[sizeof(T)];
+            auto m = (void*)malloc(sizeof(T));
             make_from_tuple<T>(m, params);
             auto u = (void**)lua_newuserdata(L, sizeof(void*) * 2);
             *u = (void*)m; *(u + 1) = (void*)0xC0FFEE;
@@ -142,7 +146,7 @@ namespace LuaBinding {
         using ParamList = std::tuple<std::decay_t<Params>...>;
     public:
         static int f(lua_State* L) {
-            auto fnptr = reinterpret_cast <std::function<R(Params...)>*> (lua_touserdata(L, lua_upvalueindex(2)));
+            auto fnptr = reinterpret_cast <std::function<R(Params...)>*> (lua_touserdata(L, lua_upvalueindex(1)));
             ParamList params;
             assign_tup(L, params);
             if constexpr (std::is_void_v<R>) {
@@ -158,7 +162,7 @@ namespace LuaBinding {
     class TraitsCFunc {
     public:
         static int f(lua_State* L) {
-            auto fnptr = reinterpret_cast <int(*)(State)> (lua_touserdata(L, lua_upvalueindex(2)));
+            auto fnptr = reinterpret_cast <int(*)(State)> (lua_touserdata(L, lua_upvalueindex(1)));
             return fnptr(State(L));
         }
     };

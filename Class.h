@@ -1,27 +1,8 @@
 #pragma once
 #include <functional>
+#include "Function.h"
 
 namespace LuaBinding {
-    namespace detail
-    {
-        template <typename F>
-        struct function_traits : public function_traits<decltype(&F::operator())> {};
-
-        template <typename R, typename C, typename... Args>
-        struct function_traits<R (C::*)(Args...) const>
-        {
-            using function_type = std::function<R (Args...)>;
-        };
-
-        template <typename R, typename C, typename... Args>
-        struct function_traits<R (C::*)(Args...)>
-        {
-            using function_type = std::function<R (Args...)>;
-        };
-    }
-
-    template <typename F>
-    using function_type_t = typename detail::function_traits<F>::function_type;
 
     template<class T>
     class helper {
@@ -42,6 +23,9 @@ namespace LuaBinding {
         }
     };
 
+    template<typename C, typename ...Functions>
+    class OverloadedFunction;
+
     template<typename T>
     class Class {
         lua_State* L = nullptr;
@@ -53,11 +37,6 @@ namespace LuaBinding {
 
             lua_pushcclosure(L, lua_CGCFunction, 0);
             lua_setfield(L, -2, "__gc");
-
-            lua_newtable(L);
-            lua_pushcclosure(L, lua_CGCProtector, 0);
-            lua_setfield(L, -2, "__newindex");
-            lua_setmetatable(L, -2);
 
             lua_pushcclosure(L, lua_CIndexFunction, 0);
             lua_setfield(L, -2, "__index");
@@ -107,20 +86,9 @@ namespace LuaBinding {
                 pcall(S, 1, 0);
             }
             auto u = (void**)lua_touserdata(S, 1);
-            if (*(u + 1) == (void*)0xC0FFEE)
-            {
-                delete[] *u;
+            if (*(u + 1) == (void*)0xC0FFEE) {
+                free(*u);
             }
-            return 0;
-        }
-        static int lua_CGCProtector(lua_State* S) {
-            if (strcmp(lua_tostring(S, 2), "__gc") == 0)
-            {
-                lua_remove(S, 2);
-                lua_pushstring(S, "__cgc");
-                lua_insert(S, 2);
-            }
-            lua_rawset(S, 1);
             return 0;
         }
         static int get_vtable(lua_State *L)
@@ -327,8 +295,8 @@ namespace LuaBinding {
                 lua_pushstring(L, "__call");
                 lua_pushcclosure(L, TraitsCtor<T, Params...>::f, 0);
                 lua_settable(L, -3);
-                lua_pushcclosure(L, lua_CGCProtector, 0);
-                lua_setfield(L, -2, "__newindex");
+                //lua_pushcclosure(L, lua_CGCProtector, 0);
+                //lua_setfield(L, -2, "__newindex");
 
                 lua_setmetatable(L, -2);
 
@@ -346,8 +314,8 @@ namespace LuaBinding {
                 lua_pushstring(L, "__call");
                 lua_pushcclosure(L, TraitsCtor<T, Params...>::f, 0);
                 lua_settable(L, -3);
-                lua_pushcclosure(L, lua_CGCProtector, 0);
-                lua_setfield(L, -2, "__newindex");
+                //lua_pushcclosure(L, lua_CGCProtector, 0);
+                //lua_setfield(L, -2, "__newindex");
 
                 lua_setmetatable(L, -2);
 
@@ -368,61 +336,20 @@ namespace LuaBinding {
             return *this;
         }
 
-        template <class R, class... Params>
-        Class<T>& fun(const char* name, R(* func)(Params...))
-        {
-            using FnType = decltype (func);
+        template<typename ...Funcs>
+        Class<T>& overload(const char* name, Funcs... functions) {
             push_function_index();
-            new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsNClass<R, T, Params...>::f, 1);
+            OverloadedFunction<T, Funcs...>(L, functions...);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
             return *this;
         }
 
-        template <class R, class... Params>
-        Class<T>& fun(const char* name, R(T::* func)(Params...))
+        template <class F>
+        Class<T>& fun(const char* name, F& func)
         {
-            using FnType = decltype (func);
             push_function_index();
-            new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsClass<R, T, Params...>::f, 1);
-            lua_setfield(L, -2, name);
-            lua_pop(L, 1);
-            return *this;
-        }
-
-        template <class R, class... Params>
-        Class<T>& fun(const char* name, R(T::* func)(Params...) const)
-        {
-            using FnType = std::decay_t<decltype (func)>;
-            push_function_index();
-            new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsClass<R, T, Params...>::f, 1);
-            lua_setfield(L, -2, name);
-            lua_pop(L, 1);
-            return *this;
-        }
-
-        template <class R, class... Params>
-        Class<T>& fun(const char* name, std::function<R(Params...)> func)
-        {
-            using FnType = decltype (func);
-            push_function_index();
-            new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsFunClass<R, T, Params...>::f, 1);
-            lua_setfield(L, -2, name);
-            lua_pop(L, 1);
-            return *this;
-        }
-
-        template <class R, class... Params>
-        Class<T>& fun(const char* name, std::function<R(Params...) const> func)
-        {
-            using FnType = std::decay_t<decltype (func)>;
-            push_function_index();
-            new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsFunClass<R, T, Params...>::f, 1);
+            Function::fun<T>(L, func);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
             return *this;
@@ -431,7 +358,10 @@ namespace LuaBinding {
         template <class F>
         Class<T>& fun(const char* name, F&& func)
         {
-            fun(name, static_cast<function_type_t<std::decay_t<F>>>(func));
+            push_function_index();
+            Function::fun<T>(L, func);
+            lua_setfield(L, -2, name);
+            lua_pop(L, 1);
             return *this;
         }
 
@@ -455,7 +385,7 @@ namespace LuaBinding {
         {
             prop_fun(name, std::forward<F>(func));
             push_metatable();
-            lua_pushstring(L, "__cvalid");
+            lua_pushstring(L, "__valid");
             push_property_index();
             lua_pushstring(L, name);
             lua_rawget(L, -2);
@@ -470,7 +400,7 @@ namespace LuaBinding {
         {
             prop_cfun(name, std::forward<F>(func));
             push_metatable();
-            lua_pushstring(L, "__cvalid");
+            lua_pushstring(L, "__valid");
             push_property_index();
             lua_pushstring(L, name);
             lua_rawget(L, -2);
@@ -480,94 +410,11 @@ namespace LuaBinding {
             return *this;
         }
 
-        template <class R> requires std::is_integral_v<R>
-        Class<T>& cfun(const char* name, R(T::*func)(lua_State*))
-        {
-            using func_t = decltype (func);
-            push_function_index();
-            new (lua_newuserdata(L, sizeof(func))) func_t(func);
-            lua_pushcclosure(L, TraitsClassLCFunc<T>::f, 1);
-            lua_setfield(L, -2, name);
-            lua_pop(L, 1);
-            return *this;
-        }
-
-        template <class R> requires std::is_integral_v<R>
-        Class<T>& cfun(const char* name, std::function<R(T*, lua_State*)> func)
-        {
-            using FnType = decltype (func);
-            push_function_index();
-            new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsClassFunLCFunc<T>::f, 1);
-            lua_setfield(L, -2, name);
-            lua_pop(L, 1);
-            return *this;
-        }
-
-        template <class R> requires std::is_integral_v<R>
-        Class<T>& cfun(const char* name, R(*func)(lua_State*))
+        template <class F>
+        Class<T>& cfun(const char* name, F& func)
         {
             push_function_index();
-            lua_pushcclosure(L, func, 0);
-            lua_setfield(L, -2, name);
-            lua_pop(L, 1);
-            return *this;
-        }
-
-        template <class R> requires std::is_integral_v<R>
-        Class<T>& cfun(const char* name, std::function<R(lua_State*)> func)
-        {
-            using FnType = decltype (func);
-            push_function_index();
-            new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsClassFunNLCFunc<T>::f, 1);
-            lua_setfield(L, -2, name);
-            lua_pop(L, 1);
-            return *this;
-        }
-
-        template <class R, class U> requires std::is_integral_v<R>
-        Class<T>& cfun(const char* name, R(T::*func)(U))
-        {
-            using func_t = decltype (func);
-            push_function_index();
-            new (lua_newuserdata(L, sizeof(func))) func_t(func);
-            lua_pushcclosure(L, TraitsClassCFunc<T>::f, 1);
-            lua_setfield(L, -2, name);
-            lua_pop(L, 1);
-            return *this;
-        }
-
-        template <class R, class U> requires std::is_integral_v<R>
-        Class<T>& cfun(const char* name, R(*func)(U))
-        {
-            push_function_index();
-            lua_pushlightuserdata(L, reinterpret_cast<void*>(func));
-            lua_pushcclosure(L, TraitsClassNCFunc<T>::f, 1);
-            lua_setfield(L, -2, name);
-            lua_pop(L, 1);
-            return *this;
-        }
-
-        template <class R, class U> requires std::is_integral_v<R>
-        Class<T>& cfun(const char* name, std::function<R(U)> func)
-        {
-            using FnType = decltype (func);
-            push_function_index();
-            new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsClassFunNCFunc<T>::f, 1);
-            lua_setfield(L, -2, name);
-            lua_pop(L, 1);
-            return *this;
-        }
-
-        template <class R, class U> requires std::is_integral_v<R>
-        Class<T>& cfun(const char* name, std::function<R(T*, U)> func)
-        {
-            using FnType = decltype (func);
-            push_function_index();
-            new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsClassFunCFunc<T>::f, 1);
+            Function::cfun<T>(L, func);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
             return *this;
@@ -576,7 +423,10 @@ namespace LuaBinding {
         template <class F>
         Class<T>& cfun(const char* name, F&& func)
         {
-            cfun(name, static_cast<function_type_t<std::decay_t<F>>>(func));
+            push_function_index();
+            Function::cfun<T>(L, func);
+            lua_setfield(L, -2, name);
+            lua_pop(L, 1);
             return *this;
         }
 
@@ -595,200 +445,31 @@ namespace LuaBinding {
             return *this;
         }
 
-        template <class R, class... Params>
-        Class<T>& meta_fun(const char* name, R(* func)(Params...))
+        template <class F>
+        Class<T>& meta_fun(const char* name, F func)
         {
             if (strcmp(name, "__gc") == 0) {
                 return meta_fun("__cgc", std::forward<decltype(func)>(func));
             }
             using FnType = decltype (func);
             push_metatable();
-            new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsNClass<R, T, Params...>::f, 1);
-            lua_setfield(L, -2, name);
-            lua_pop(L, 1);
-            return *this;
-        }
-
-        template <class R, class... Params>
-        Class<T>& meta_fun(const char* name, R(T::* func)(Params...))
-        {
-            if (strcmp(name, "__gc") == 0) {
-                return meta_fun("__cgc", std::forward<decltype(func)>(func));
-            }
-            using FnType = decltype (func);
-            push_metatable();
-            new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsClass<R, T, Params...>::f, 1);
-            lua_setfield(L, -2, name);
-            lua_pop(L, 1);
-            return *this;
-        }
-
-        template <class R, class... Params>
-        Class<T>& meta_fun(const char* name, R(T::* func)(Params...) const)
-        {
-            if (strcmp(name, "__gc") == 0) {
-                return meta_fun("__cgc", std::forward<decltype(func)>(func));
-            }
-            using FnType = decltype (func);
-            push_metatable();
-            new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsClass<R, T, Params...>::f, 1);
-            lua_setfield(L, -2, name);
-            lua_pop(L, 1);
-            return *this;
-        }
-
-        template <class R, class... Params>
-        Class<T>& meta_fun(const char* name, std::function<R(Params...)> func)
-        {
-            if (strcmp(name, "__gc") == 0) {
-                return meta_fun("__cgc", std::forward<decltype(func)>(func));
-            }
-            using FnType = decltype (func);
-            push_metatable();
-            new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsFunClass<R, T, Params...>::f, 1);
-            lua_setfield(L, -2, name);
-            lua_pop(L, 1);
-            return *this;
-        }
-
-        template <class R, class... Params>
-        Class<T>& meta_fun(const char* name, std::function<R(Params...) const> func)
-        {
-            if (strcmp(name, "__gc") == 0) {
-                return meta_fun("__cgc", std::forward<decltype(func)>(func));
-            }
-            using FnType = decltype (func);
-            push_metatable();
-            new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsFunClass<R, T, Params...>::f, 1);
+            Function::fun<T>(L, func);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
             return *this;
         }
 
         template <class F>
-        Class<T>& meta_fun(const char* name, F&& func)
-        {
-            if (strcmp(name, "__gc") == 0) {
-                return meta_fun("__cgc", std::forward<decltype(func)>(func));
-            }
-            meta_fun(name, static_cast<function_type_t<std::decay_t<F>>>(func));
-            return *this;
-        }
-
-        template <class R> requires std::is_integral_v<R>
-        Class<T>& meta_cfun(const char* name, R(T::*func)(lua_State*))
+        Class<T>& meta_cfun(const char* name, F func)
         {
             if (strcmp(name, "__gc") == 0) {
                 return meta_cfun("__cgc", std::forward<decltype(func)>(func));
             }
             using func_t = decltype (func);
             push_metatable();
-            new (lua_newuserdata(L, sizeof(func))) func_t(func);
-            lua_pushcclosure(L, TraitsClassLCFunc<T>::f, 1);
+            Function::cfun<T>(L, func);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
-            return *this;
-        }
-
-        template <class R> requires std::is_integral_v<R>
-        Class<T>& meta_cfun(const char* name, std::function<R(T*, lua_State*)> func)
-        {
-            if (strcmp(name, "__gc") == 0) {
-                return meta_cfun("__cgc", std::forward<decltype(func)>(func));
-            }
-            using FnType = decltype (func);
-            push_metatable();
-            new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsClassFunLCFunc<T>::f, 1);
-            lua_setfield(L, -2, name);
-            lua_pop(L, 1);
-            return *this;
-        }
-
-        template <class R> requires std::is_integral_v<R>
-        Class<T>& meta_cfun(const char* name, R(*func)(lua_State*))
-        {
-            if (strcmp(name, "__gc") == 0) {
-                return meta_cfun("__cgc", std::forward<decltype(func)>(func));
-            }
-            push_metatable();
-            lua_pushcclosure(L, func, 0);
-            lua_setfield(L, -2, name);
-            lua_pop(L, 1);
-            return *this;
-        }
-
-        template <class R> requires std::is_integral_v<R>
-        Class<T>& meta_cfun(const char* name, std::function<R(lua_State*)> func)
-        {
-            if (strcmp(name, "__gc") == 0) {
-                return meta_cfun("__cgc", std::forward<decltype(func)>(func));
-            }
-            using FnType = decltype (func);
-            push_metatable();
-            new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsClassFunNLCFunc<T>::f, 1);
-            lua_setfield(L, -2, name);
-            lua_pop(L, 1);
-            return *this;
-        }
-
-        template <class R, class U> requires std::is_integral_v<R>
-        Class<T>& meta_cfun(const char* name, R(T::*func)(U))
-        {
-            if (strcmp(name, "__gc") == 0) {
-                return meta_cfun("__cgc", std::forward<decltype(func)>(func));
-            }
-            using func_t = decltype (func);
-            push_metatable();
-            new (lua_newuserdata(L, sizeof(func))) func_t(func);
-            lua_pushcclosure(L, TraitsClassCFunc<T>::f, 1);
-            lua_setfield(L, -2, name);
-            lua_pop(L, 1);
-            return *this;
-        }
-
-        template <class R, class U> requires std::is_integral_v<R>
-        Class<T>& meta_cfun(const char* name, R(*func)(U))
-        {
-            if (strcmp(name, "__gc") == 0) {
-                return meta_cfun("__cgc", std::forward<decltype(func)>(func));
-            }
-            push_metatable();
-            lua_pushlightuserdata(L, reinterpret_cast<void*>(func));
-            lua_pushcclosure(L, TraitsClassNCFunc<T>::f, 1);
-            lua_setfield(L, -2, name);
-            lua_pop(L, 1);
-            return *this;
-        }
-
-        template <class R, class U> requires std::is_integral_v<R>
-        Class<T>& meta_cfun(const char* name, std::function<R(T*, U)> func)
-        {
-            if (strcmp(name, "__gc") == 0) {
-                return meta_cfun("__cgc", std::forward<decltype(func)>(func));
-            }
-            using FnType = decltype (func);
-            push_metatable();
-            new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsClassFunCFunc<T>::f, 1);
-            lua_setfield(L, -2, name);
-            lua_pop(L, 1);
-            return *this;
-        }
-
-        template <class F>
-        Class<T>& meta_cfun(const char* name, F&& func)
-        {
-            if (strcmp(name, "__gc") == 0) {
-                return meta_cfun("__cgc", std::forward<decltype(func)>(func));
-            }
-            meta_cfun(name, static_cast<function_type_t<std::decay_t<F>>>(func));
             return *this;
         }
 
@@ -1118,6 +799,7 @@ namespace LuaBinding {
                 lua_pushnil(L);
                 return 1;
             }
+
 
             auto u = (void**)lua_newuserdata(L, sizeof(void*) * 2);
             *u = p; *(u + 1) = 0;
