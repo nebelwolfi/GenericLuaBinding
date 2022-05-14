@@ -70,16 +70,30 @@ namespace LuaBinding {
             return Stack<T>::push(L, t);
         }
 
-        template<class T> requires (!is_pushable<T>)
+        template<class T> requires (!is_pushable<T> && !std::is_same_v<T, nullptr_t>)
         int push(lua_State*L, T& t)
         {
             return StackClass<T>::push(L, t);
         }
 
-        template<class T> requires (!is_pushable<T>)
+        template<class T> requires (!is_pushable<T> && !std::is_same_v<T, nullptr_t>)
         int push(lua_State*L, T&& t)
         {
             return StackClass<T>::push(L, t);
+        }
+
+        template<class T> requires (!is_pushable<T> && std::is_same_v<T, nullptr_t>)
+        int push(lua_State* L, T& t)
+        {
+            lua_pushnil(L);
+            return 1;
+        }
+
+        template<class T> requires (!is_pushable<T> && std::is_same_v<T, nullptr_t>)
+        int push(lua_State* L, T&& t)
+        {
+            lua_pushnil(L);
+            return 1;
         }
 
         template<class T> requires is_pushable<T>
