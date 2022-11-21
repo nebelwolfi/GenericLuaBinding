@@ -13,7 +13,6 @@
 
 ## 📝 Table of Contents
 
-- [About](#about)
 - [Compatability](#compatability)
 - [Quick and Dirty](#quick_and_dirty)
 - [Full Documentation](#full_documentation)
