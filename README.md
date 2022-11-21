@@ -120,6 +120,7 @@ State:
   exec(code, argn, nres) -> int       // executes code
   exec(env, code, argn, nres) -> int  // executes code in an env
   call<T>(params...) -> T             // call func on top of stack
+  call<T>(env, params...) -> T        // call func on top of stack in an env
   error(fmt, ...)                     // throws error in lua
   at(index : int) -> Object           // returns Object at stack index
   at(index : string) -> ObjectRef     // returns ObjectRef at global index
@@ -153,7 +154,9 @@ Env        // from State::addEnv
   push()                              // pushes this object to top of stack
   pop()                               // pops this object from stack
   call<R>(params...) -> R             // calls obj with return type T
+  call<R>(env, params...) -> R        // calls obj with return type T in an env
   call<int n>(params...) -> void      // calls obj with result count n
+  call<int n>(env, params...) -> void // calls obj with result count n in an env
   set(index, t)                       // sets table index value
   fun(index, f)                       // sets table index func
   cfun(index, f)                      // sets table index cfunc
