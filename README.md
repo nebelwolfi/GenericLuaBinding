@@ -29,14 +29,6 @@ Tested against LuaJIT 2.1 and Lua 5.4, will happily fix compats with other versi
 ```
 #### standalone example
 ```cpp
-class Sprite {
-public:
-  int width, height;
-  SpriteInfo info;
-  Vector<2> GetSize();
-  void Draw();
-}
-
 int main() {
   auto S = std::make_unique<LuaBinding::State>();
 
@@ -52,6 +44,24 @@ int main() {
     print(s.width)
     s:draw()
   )");
+
+  auto env = S->addEnv();
+  env.set("var", 1);
+
+  try {
+    S->exec(env, R"(
+      print(var) -- 1
+      var = 2
+    )");
+    S->exec(env, R"(
+      print(var) -- 2
+    )");
+    S->exec(R"(
+      print(var) -- nil
+    )");
+  } catch (std::exception& e) {
+    printf("Lua Error: %s", e.what());
+  }
 }
 ```
 #### lua module example
