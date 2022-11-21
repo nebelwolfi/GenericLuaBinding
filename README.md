@@ -34,7 +34,7 @@ class Sprite {
 public:
   int width, height;
   SpriteInfo info;
-  vec2 GetSize();
+  Vector<2> GetSize();
   void Draw();
 }
 
@@ -51,12 +51,13 @@ int main() {
   S->exec(R"(
     local s = Sprite("icon.png")
     print(s.width)
+    s:draw()
   )");
 }
 ```
 #### lua module example
 ```cpp
-int my_print(LuaBinding::State S) {
+void my_print(LuaBinding::State S) {
   std::string out;
   // get global tostring
   auto tostring = S.at("tostring");
@@ -64,15 +65,13 @@ int my_print(LuaBinding::State S) {
   for (auto o : S) {
     if (o.is<std::string>()) {
       out += o.as<std::string>();
-      out += "\t";
     } else {
+      // could also use o.tolstring() instead
       out += tostring.call<std::string>(o);
-      // could also use o.tolstring() here
-      out += "\t";
     }
+    out += "\t";
   }
   printf("%s", out.c_str());
-  return 0;
 }
 
 int luaopen_mylib(lua_State *L) {
@@ -84,9 +83,9 @@ int luaopen_mylib(lua_State *L) {
   CLib.set("name", "CLib");
 
   // set func
-  CLib.fun("CLib.printf", [](LuaBinding::Object o){ printf(o.tostring()); });
+  CLib.fun("printf", [](LuaBinding::Object o){ printf("%s", o.tolstring()); });
   // can also do it like this
-  S.cfun("CLib.print", my_print);
+  S.fun("CLib.print", my_print);
 
   // push it to stack as return value
   S.at("CLib").push();
@@ -130,9 +129,9 @@ Class
   prop_fun(name, getf [, setf])       // binds property with getter and setter
   prop_cfun(name, getf [, setf])      // binds property with cgetter and csetter
   overload(name, funcs)               // binds overloaded funcs
-  
+
 Object     // on stack
-ObjectRef  // storage
+ObjectRef  // stored in registry
 Env        // from State::addEnv
   tostring() -> const char*           // calls lua_tostring()
   tolstring() -> const char*          // calls tostring(o) in lua and returns the result
@@ -153,7 +152,6 @@ Env        // from State::addEnv
   type() -> int                       // LUA_T...
   valid() -> bool                     // checks if obj is still valid
   len() -> int                        // table length or udata size
-
 ```
 Lua C Function formats supported by cfunc calls:
 ```cpp
