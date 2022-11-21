@@ -127,6 +127,37 @@ namespace LuaBinding {
             this->idx = LUA_REFNIL;
         }
 
+        template<typename R, bool C = false>
+        R call() {
+            push();
+            if constexpr (std::is_same_v<void, R>) {
+                if (LuaBinding::pcall(L, 0, 0))
+                {
+                    throw std::exception(lua_tostring(L, -1));
+                }
+            } else {
+                if (LuaBinding::pcall(L, 0, 1))
+                {
+                    throw std::exception(lua_tostring(L, -1));
+                }
+                if constexpr(C) {
+                    auto result = LuaBinding::detail::get<R>(L, -1);
+                    lua_pop(L, 1);
+                    return result;
+                } else
+                    return LuaBinding::detail::get<R>(L, -1);
+            }
+        }
+
+        template<int R>
+        void call() {
+            push();
+            if (LuaBinding::pcall(L, 0, R))
+            {
+                throw std::exception(lua_tostring(L, -1));
+            }
+        }
+
         template<typename R, bool C = false, typename ...Params> requires (!std::is_same_v<std::tuple_element_t<0, std::tuple<Params...>>, Environment>)
         R call(Params... param) {
             push();

@@ -47,34 +47,54 @@ namespace LuaBinding {
             lua_pushlightuserdata(L, new std::vector<DynClass*>());
             lua_setfield(L, -2, "dynamic_class_store");
             lua_setglobal(L, "__DATASTORE");
-
         }
         State(lua_State*L) : L(L), view(true) {
+            lua_getglobal(L, "__METASTORE");
+            if (lua_isnil(L, -1)) {
+                lua_pop(L, 1);
+                lua_newtable(L);
+                lua_setglobal(L, "__METASTORE");
+            }
+            else {
+                lua_pop(L, 1);
+            }
         }
         State(const State& state) : L(state.L), view(true) {
+            lua_getglobal(L, "__METASTORE");
+            if (lua_isnil(L, -1)) {
+                lua_pop(L, 1);
+                lua_newtable(L);
+                lua_setglobal(L, "__METASTORE");
+            }
+            else {
+                lua_pop(L, 1);
+            }
         }
 
         template <class... Ts>
         State(std::tuple<Ts...> const& tup)
             : State(tup, std::index_sequence_for<Ts...>{})
         {
+            //Zenbot::Logger::Log("Creating Lua state (tuple1)");
         }
 
         template <class Tuple, size_t... Is>
         State(Tuple const& tup, std::index_sequence<Is...> )
             : State(std::get<Is>(tup)...)
         {
+            //Zenbot::Logger::Log("Creating Lua state (tuple2)");
         }
 
         ~State() {
             if (!view) {
+                //Zenbot::Logger::Log("Destroying Lua state");
                 for (auto& c : *get_dynamic_classes())
                     delete c;
                 get_dynamic_classes()->clear();
                 delete get_dynamic_classes();
                 lua_close(L);
                 L = nullptr;
-            }
+            } //else Zenbot::Logger::Log("Destroying Lua state (view)");
         }
 
         lua_State* lua_state() {
@@ -533,7 +553,6 @@ namespace LuaBinding {
             }
         }
 
-        template<bool C = false>
         void set_field(int idx, const char* name)
         {
             lua_setfield(L, idx, name);

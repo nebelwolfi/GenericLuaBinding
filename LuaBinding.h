@@ -1,6 +1,5 @@
 #pragma once
 
-#include <lua.hpp>
 #include <type_traits>
 #include <stdexcept>
 
