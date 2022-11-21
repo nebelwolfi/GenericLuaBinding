@@ -11,10 +11,6 @@
 
 ---
 
-<p align="center"> Not necessarily better but less annoying than the rest.
-    <br> 
-</p>
-
 ## 📝 Table of Contents
 
 - [About](#about)
@@ -41,8 +37,9 @@ public:
   vec2 GetSize();
   void Draw();
 }
+
 int main() {
-  auto S = std::make_unique<State>();
+  auto S = std::make_unique<LuaBinding::State>();
 
   S->addClass<Sprite>("Sprite")
     .ctor<std::string>()
@@ -79,7 +76,7 @@ int my_print(LuaBinding::State S) {
 }
 
 int luaopen_mylib(lua_State *L) {
-  State S(L);
+  LuaBinding::State S(L);
 
   // create global table and get ref
   auto CLib = S.table("CLib");
