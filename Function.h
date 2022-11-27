@@ -73,12 +73,6 @@ namespace LuaBinding {
             lua_pushcclosure(L, TraitsFunClass<R, T, Params...>::f, 1);
         }
 
-        template <class T, class F>
-        void fun(lua_State *L, F&& func)
-        {
-            fun<T>(L, static_cast<function_type_t<std::decay_t<F>>>(func));
-        }
-
         template <class T, class R> requires std::is_integral_v<R>
         void cfun(lua_State *L, R(T::*func)(lua_State*))
         {
@@ -146,12 +140,6 @@ namespace LuaBinding {
             using FnType = decltype (func);
             new (lua_newuserdata(L, sizeof(func))) FnType(func);
             lua_pushcclosure(L, TraitsCFunc<T>::f, 1);
-        }
-
-        template <class T, class F>
-        void cfun(lua_State *L, F&& func)
-        {
-            cfun(L, static_cast<function_type_t<std::decay_t<F>>>(func));
         }
     }
 
@@ -358,37 +346,27 @@ namespace LuaBinding {
         };
 
         template <typename T>
-        concept is_pushable_fun = (std::is_function_v<std::remove_pointer_t<T>> || std::is_member_function_pointer_v<std::remove_pointer_t<T>> || std::is_member_object_pointer_v<std::remove_pointer_t<T>> || has_call_operator<T>) && requires (T t) {
-            { Function::fun<void>(nullptr, t) } -> std::same_as<void>;
+        concept is_pushable_fun = (std::is_function_v<std::remove_pointer_t<T>> || std::is_member_function_pointer_v<std::remove_pointer_t<T>> || has_call_operator<T>) && requires (T t) {
+            { Function::fun<void>(nullptr, t) };
         };
 
         template <typename T>
-        concept is_pushable_cfun = (std::is_function_v<std::remove_pointer_t<T>> || std::is_member_function_pointer_v<std::remove_pointer_t<T>> || std::is_member_object_pointer_v<std::remove_pointer_t<T>> || has_call_operator<T>) && requires (T t) {
-            { Function::cfun<void>(nullptr, t) } -> std::same_as<void>;
+        concept is_pushable_cfun = (std::is_function_v<std::remove_pointer_t<T>> || std::is_member_function_pointer_v<std::remove_pointer_t<T>> || has_call_operator<T>) && requires (T t) {
+            { Function::cfun<void>(nullptr, t) };
         };
+    }
 
-        template<class T> requires (is_pushable_fun<T>)
-        int push(lua_State* L, T&& t)
+    namespace Function {
+        template <class T, class F>
+        void fun(lua_State *L, F&& func)
         {
-            return Function::fun<void>(L, t);
+            fun<T>(L, static_cast<function_type_t<std::decay_t<F>>>(func));
         }
 
-        template<class T> requires (is_pushable_fun<T>)
-        int push(lua_State* L, T& t)
+        template <class T, class F>
+        void cfun(lua_State *L, F&& func)
         {
-            return Function::fun<void>(L, t);
-        }
-
-        template<class T> requires (is_pushable_cfun<T>)
-        int push(lua_State* L, T&& t)
-        {
-            return Function::cfun<void>(L, t);
-        }
-
-        template<class T> requires (is_pushable_cfun<T>)
-        int push(lua_State* L, T& t)
-        {
-            return Function::cfun<void>(L, t);
+            cfun(L, static_cast<function_type_t<std::decay_t<F>>>(func));
         }
     }
 }
