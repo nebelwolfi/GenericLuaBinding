@@ -18,7 +18,6 @@ namespace LuaBinding {
     class State {
         lua_State* L = nullptr;
         bool view = false;
-        ObjectRef globals;
 
 #ifdef LUABINDING_DYN_CLASSES
         std::vector<DynClass*>* get_dynamic_classes() {
@@ -552,8 +551,7 @@ namespace LuaBinding {
 
         IndexProxy operator[](const char* idx)
         {
-            if (!globals.valid())
-                globals = at("_G");
+            static ObjectRef globals = at("_G");
             return IndexProxy(globals, idx);
         }
 

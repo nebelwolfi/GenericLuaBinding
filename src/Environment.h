@@ -38,7 +38,7 @@ namespace LuaBinding {
 #if LUA_VERSION_NUM < 502
             lua_getfenv(L, findex);
 #else
-            lua_getuservalue(L, findex);
+            lua_getupvalue(L, findex, 1);
 #endif
             this->idx = luaL_ref(L, LUA_REGISTRYINDEX);
         }
@@ -48,7 +48,7 @@ namespace LuaBinding {
 #if LUA_VERSION_NUM < 502
             lua_getfenv(L, lua_upvalueindex(1));
 #else
-            lua_getuservalue(L, lua_upvalueindex(1));
+            lua_getupvalue(L, lua_upvalueindex(1), 1);
 #endif
             this->idx = luaL_ref(L, LUA_REGISTRYINDEX);
         }
@@ -57,7 +57,7 @@ namespace LuaBinding {
 #if LUA_VERSION_NUM < 502
             lua_setfenv(L, lua_gettop(L) - narg - 1);
 #else
-            lua_setuservalue(L, lua_gettop(L) - narg - 1);
+            lua_setupvalue(L, lua_gettop(L) - narg - 1, 1);
 #endif
             int errindex = lua_gettop(L) - narg;
             lua_pushcclosure(L, tack_on_traceback, 0);
