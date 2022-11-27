@@ -2204,29 +2204,33 @@ namespace LuaBinding {
         int int_index;
 
     public:
-        IndexProxy(ObjectRef& el, const char* str_index) : element(el), str_index(str_index), int_index(-1) {}
-        IndexProxy(ObjectRef& el, int int_index) : element(el), str_index(nullptr), int_index(int_index) {}
+        IndexProxy(ObjectRef& el, const char* str_index) : element(el), str_index(str_index), int_index(-1) {
+            this->L = el.lua_state();
+        }
+        IndexProxy(ObjectRef& el, int int_index) : element(el), str_index(nullptr), int_index(int_index) {
+            this->L = el.lua_state();
+        }
 
         operator ObjectRef () const {
             element.push();
             if (str_index)
-                lua_getfield(element.lua_state(), -1, str_index);
+                lua_getfield(L, -1, str_index);
             else
-                lua_rawgeti(element.lua_state(), -1, int_index);
-            lua_remove(element.lua_state(), -2);
-            return ObjectRef(element.lua_state(), -1, false);
+                lua_rawgeti(L, -1, int_index);
+            lua_remove(L, -2);
+            return ObjectRef(L, -1, false);
         }
 
         int push(int i = -1) const override
         {
             element.push();
             if (str_index)
-                lua_getfield(element.lua_state(), -1, str_index);
+                lua_getfield(L, -1, str_index);
             else
-                lua_rawgeti(element.lua_state(), -1, int_index);
-            lua_remove(element.lua_state(), -2);
+                lua_rawgeti(L, -1, int_index);
+            lua_remove(L, -2);
             if (i != -1)
-                lua_insert(element.lua_state(), i);
+                lua_insert(L, i);
             return 1;
         }
 
@@ -2234,24 +2238,24 @@ namespace LuaBinding {
         {
             element.push();
             if (str_index)
-                lua_getfield(element.lua_state(), -1, str_index);
+                lua_getfield(L, -1, str_index);
             else
-                lua_rawgeti(element.lua_state(), -1, int_index);
-            lua_remove(element.lua_state(), -2);
+                lua_rawgeti(L, -1, int_index);
+            lua_remove(L, -2);
             if (i != -1)
-                lua_insert(element.lua_state(), i);
+                lua_insert(L, i);
             return 1;
         }
 
         void pop() override
         {
             element.push();
-            lua_pushnil(element.lua_state());
+            lua_pushnil(L);
             if (str_index)
-                lua_setfield(element.lua_state(), -2, str_index);
+                lua_setfield(L, -2, str_index);
             else
-                lua_rawseti(element.lua_state(), -2, int_index);
-            lua_pop(element.lua_state(), 1);
+                lua_rawseti(L, -2, int_index);
+            lua_pop(L, 1);
         }
 
         template <typename T>
@@ -4290,10 +4294,10 @@ namespace LuaBinding {
             throw std::out_of_range("wat");
         }
 
-        ObjectRef operator[](const char* idx)
+        IndexProxy operator[](const char* idx)
         {
-            lua_getglobal(L, idx);
-            return ObjectRef(L, -1, false);
+            auto ref = this->at("_G");
+            return IndexProxy(ref, idx);
         }
 
         template <class T>
@@ -4491,7 +4495,7 @@ namespace LuaBinding {
         using ParamList = std::tuple<std::decay_t<Params>...>;
     public:
         static int f(lua_State* L) {
-            auto fnptr = reinterpret_cast <std::function<R(Params...)>*> (lua_touserdata(L, lua_upvalueindex(1)));
+            auto fnptr = *reinterpret_cast <std::function<R(Params...)>*> (lua_touserdata(L, lua_upvalueindex(1)));
             ParamList params;
             assign_tup(L, params);
             if constexpr (std::is_void_v<R>) {
@@ -4594,7 +4598,7 @@ namespace LuaBinding {
     public:
         static int f(lua_State* L) {
             auto t = StackClass<T*>::get(L, 1);
-            auto fnptr = reinterpret_cast <std::function<int(T*, State)>*> (lua_touserdata(L, lua_upvalueindex(1)));
+            auto fnptr = *reinterpret_cast <std::function<int(T*, State)>*> (lua_touserdata(L, lua_upvalueindex(1)));
             return fnptr(t, State(L));
         }
     };
@@ -4614,7 +4618,7 @@ namespace LuaBinding {
     public:
         static int f(lua_State* L) {
             auto t = StackClass<T*>::get(L, 1);
-            auto fnptr = reinterpret_cast <std::function<int(T*, lua_State*)>*> (lua_touserdata(L, lua_upvalueindex(1)));
+            auto fnptr = *reinterpret_cast <std::function<int(T*, lua_State*)>*> (lua_touserdata(L, lua_upvalueindex(1)));
             return fnptr(t, L);
         }
     };
@@ -4753,13 +4757,13 @@ namespace LuaBinding {
         static int set(lua_State* L) {
             auto t = StackClass<T*>::get(L, 1);
             auto p = *(set_t*)lua_touserdata(L, lua_upvalueindex(1));
-            auto fnptr = reinterpret_cast <std::function<int(T*, lua_State*)>*> (lua_touserdata(L, lua_upvalueindex(1)));
+            auto fnptr = *reinterpret_cast <std::function<int(T*, lua_State*)>*> (lua_touserdata(L, lua_upvalueindex(1)));
             return fnptr(t, L);
         }
         static int get(lua_State* L) {
             auto t = StackClass<T*>::get(L, 1);
             auto p = *(get_t*)lua_touserdata(L, lua_upvalueindex(1));
-            auto fnptr = reinterpret_cast <std::function<int(T*, lua_State*)>*> (lua_touserdata(L, lua_upvalueindex(1)));
+            auto fnptr = *reinterpret_cast <std::function<int(T*, lua_State*)>*> (lua_touserdata(L, lua_upvalueindex(1)));
             return fnptr(t, L);
         }
     };
@@ -4788,12 +4792,12 @@ namespace LuaBinding {
     public:
         static int set(lua_State* L) {
             auto t = StackClass<T*>::get(L, 1);
-            auto fnptr = reinterpret_cast <std::function<int(T*, State)>*> (lua_touserdata(L, lua_upvalueindex(1)));
+            auto fnptr = *reinterpret_cast <std::function<int(T*, State)>*> (lua_touserdata(L, lua_upvalueindex(1)));
             return fnptr(t, State(L));
         }
         static int get(lua_State* L) {
             auto t = StackClass<T*>::get(L, 1);
-            auto fnptr = reinterpret_cast <std::function<int(T*, State)>*> (lua_touserdata(L, lua_upvalueindex(1)));
+            auto fnptr = *reinterpret_cast <std::function<int(T*, State)>*> (lua_touserdata(L, lua_upvalueindex(1)));
             return fnptr(t, State(L));
         }
     };

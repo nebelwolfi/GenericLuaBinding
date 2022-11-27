@@ -146,7 +146,7 @@ namespace LuaBinding {
         using ParamList = std::tuple<std::decay_t<Params>...>;
     public:
         static int f(lua_State* L) {
-            auto fnptr = reinterpret_cast <std::function<R(Params...)>*> (lua_touserdata(L, lua_upvalueindex(1)));
+            auto fnptr = *reinterpret_cast <std::function<R(Params...)>*> (lua_touserdata(L, lua_upvalueindex(1)));
             ParamList params;
             assign_tup(L, params);
             if constexpr (std::is_void_v<R>) {
@@ -249,7 +249,7 @@ namespace LuaBinding {
     public:
         static int f(lua_State* L) {
             auto t = StackClass<T*>::get(L, 1);
-            auto fnptr = reinterpret_cast <std::function<int(T*, State)>*> (lua_touserdata(L, lua_upvalueindex(1)));
+            auto fnptr = *reinterpret_cast <std::function<int(T*, State)>*> (lua_touserdata(L, lua_upvalueindex(1)));
             return fnptr(t, State(L));
         }
     };
@@ -269,7 +269,7 @@ namespace LuaBinding {
     public:
         static int f(lua_State* L) {
             auto t = StackClass<T*>::get(L, 1);
-            auto fnptr = reinterpret_cast <std::function<int(T*, lua_State*)>*> (lua_touserdata(L, lua_upvalueindex(1)));
+            auto fnptr = *reinterpret_cast <std::function<int(T*, lua_State*)>*> (lua_touserdata(L, lua_upvalueindex(1)));
             return fnptr(t, L);
         }
     };
@@ -408,13 +408,13 @@ namespace LuaBinding {
         static int set(lua_State* L) {
             auto t = StackClass<T*>::get(L, 1);
             auto p = *(set_t*)lua_touserdata(L, lua_upvalueindex(1));
-            auto fnptr = reinterpret_cast <std::function<int(T*, lua_State*)>*> (lua_touserdata(L, lua_upvalueindex(1)));
+            auto fnptr = *reinterpret_cast <std::function<int(T*, lua_State*)>*> (lua_touserdata(L, lua_upvalueindex(1)));
             return fnptr(t, L);
         }
         static int get(lua_State* L) {
             auto t = StackClass<T*>::get(L, 1);
             auto p = *(get_t*)lua_touserdata(L, lua_upvalueindex(1));
-            auto fnptr = reinterpret_cast <std::function<int(T*, lua_State*)>*> (lua_touserdata(L, lua_upvalueindex(1)));
+            auto fnptr = *reinterpret_cast <std::function<int(T*, lua_State*)>*> (lua_touserdata(L, lua_upvalueindex(1)));
             return fnptr(t, L);
         }
     };
@@ -443,12 +443,12 @@ namespace LuaBinding {
     public:
         static int set(lua_State* L) {
             auto t = StackClass<T*>::get(L, 1);
-            auto fnptr = reinterpret_cast <std::function<int(T*, State)>*> (lua_touserdata(L, lua_upvalueindex(1)));
+            auto fnptr = *reinterpret_cast <std::function<int(T*, State)>*> (lua_touserdata(L, lua_upvalueindex(1)));
             return fnptr(t, State(L));
         }
         static int get(lua_State* L) {
             auto t = StackClass<T*>::get(L, 1);
-            auto fnptr = reinterpret_cast <std::function<int(T*, State)>*> (lua_touserdata(L, lua_upvalueindex(1)));
+            auto fnptr = *reinterpret_cast <std::function<int(T*, State)>*> (lua_touserdata(L, lua_upvalueindex(1)));
             return fnptr(t, State(L));
         }
     };

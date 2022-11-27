@@ -684,29 +684,33 @@ namespace LuaBinding {
         int int_index;
 
     public:
-        IndexProxy(ObjectRef& el, const char* str_index) : element(el), str_index(str_index), int_index(-1) {}
-        IndexProxy(ObjectRef& el, int int_index) : element(el), str_index(nullptr), int_index(int_index) {}
+        IndexProxy(ObjectRef& el, const char* str_index) : element(el), str_index(str_index), int_index(-1) {
+            this->L = el.lua_state();
+        }
+        IndexProxy(ObjectRef& el, int int_index) : element(el), str_index(nullptr), int_index(int_index) {
+            this->L = el.lua_state();
+        }
 
         operator ObjectRef () const {
             element.push();
             if (str_index)
-                lua_getfield(element.lua_state(), -1, str_index);
+                lua_getfield(L, -1, str_index);
             else
-                lua_rawgeti(element.lua_state(), -1, int_index);
-            lua_remove(element.lua_state(), -2);
-            return ObjectRef(element.lua_state(), -1, false);
+                lua_rawgeti(L, -1, int_index);
+            lua_remove(L, -2);
+            return ObjectRef(L, -1, false);
         }
 
         int push(int i = -1) const override
         {
             element.push();
             if (str_index)
-                lua_getfield(element.lua_state(), -1, str_index);
+                lua_getfield(L, -1, str_index);
             else
-                lua_rawgeti(element.lua_state(), -1, int_index);
-            lua_remove(element.lua_state(), -2);
+                lua_rawgeti(L, -1, int_index);
+            lua_remove(L, -2);
             if (i != -1)
-                lua_insert(element.lua_state(), i);
+                lua_insert(L, i);
             return 1;
         }
 
@@ -714,24 +718,24 @@ namespace LuaBinding {
         {
             element.push();
             if (str_index)
-                lua_getfield(element.lua_state(), -1, str_index);
+                lua_getfield(L, -1, str_index);
             else
-                lua_rawgeti(element.lua_state(), -1, int_index);
-            lua_remove(element.lua_state(), -2);
+                lua_rawgeti(L, -1, int_index);
+            lua_remove(L, -2);
             if (i != -1)
-                lua_insert(element.lua_state(), i);
+                lua_insert(L, i);
             return 1;
         }
 
         void pop() override
         {
             element.push();
-            lua_pushnil(element.lua_state());
+            lua_pushnil(L);
             if (str_index)
-                lua_setfield(element.lua_state(), -2, str_index);
+                lua_setfield(L, -2, str_index);
             else
-                lua_rawseti(element.lua_state(), -2, int_index);
-            lua_pop(element.lua_state(), 1);
+                lua_rawseti(L, -2, int_index);
+            lua_pop(L, 1);
         }
 
         template <typename T>

@@ -551,10 +551,10 @@ namespace LuaBinding {
             throw std::out_of_range("wat");
         }
 
-        ObjectRef operator[](const char* idx)
+        IndexProxy operator[](const char* idx)
         {
-            lua_getglobal(L, idx);
-            return ObjectRef(L, -1, false);
+            auto ref = this->at("_G");
+            return IndexProxy(ref, idx);
         }
 
         template <class T>
