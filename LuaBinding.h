@@ -4,10 +4,19 @@
 #include <stdexcept>
 
 #if LUA_VERSION_NUM < 502
-#define luaL_tolstring lua_tolstring
 #define LUA_OPEQ 1
 #define LUA_OPLT 2
 #define LUA_OPLE 3
+    inline const char* luaL_tolstring (lua_State* L, int idx, size_t* len) {
+        if (lua_isstring(L, idx))
+            return lua_tolstring(L, idx, len);
+        lua_getglobal(L, "tostring");
+        lua_pushvalue(L, idx);
+        lua_call(L, 1, 1);
+        auto result = lua_tolstring(L, -1, len);
+        lua_pop(L, 1);
+        return result;
+    }
     inline int lua_absindex (lua_State* L, int idx)
     {
         if (idx > LUA_REGISTRYINDEX && idx < 0)

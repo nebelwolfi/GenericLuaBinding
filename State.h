@@ -49,26 +49,8 @@ namespace LuaBinding {
             lua_setglobal(L, "__DATASTORE");
         }
         State(lua_State*L) : L(L), view(true) {
-            lua_getglobal(L, "__METASTORE");
-            if (lua_isnil(L, -1)) {
-                lua_pop(L, 1);
-                lua_newtable(L);
-                lua_setglobal(L, "__METASTORE");
-            }
-            else {
-                lua_pop(L, 1);
-            }
         }
         State(const State& state) : L(state.L), view(true) {
-            lua_getglobal(L, "__METASTORE");
-            if (lua_isnil(L, -1)) {
-                lua_pop(L, 1);
-                lua_newtable(L);
-                lua_setglobal(L, "__METASTORE");
-            }
-            else {
-                lua_pop(L, 1);
-            }
         }
 
         template <class... Ts>
@@ -511,6 +493,16 @@ namespace LuaBinding {
             return ObjectRef(L, -1, false);
         }
 
+        Object top()
+        {
+            return Object(L, n());
+        }
+
+        Object front()
+        {
+            return Object(L, 1);
+        }
+
         ObjectRef table(const char* idx)
         {
             lua_getglobal(L, idx);
@@ -524,6 +516,28 @@ namespace LuaBinding {
                 lua_setglobal(L, idx);
                 return ObjectRef(L, -1, false);
             }
+        }
+
+        Object operator[](int index)
+        {
+            if (index > 0)
+            {
+                if (index > lua_gettop(L))
+                    throw std::out_of_range("invalid stack subscript");
+                return { L, index };
+            } else if (index < 0) {
+                auto top = lua_gettop(L);
+                if (-index > top)
+                    throw std::out_of_range("invalid stack subscript");
+                return { L, top + 1 + index };
+            }
+            throw std::out_of_range("wat");
+        }
+
+        ObjectRef operator[](const char* idx)
+        {
+            lua_getglobal(L, idx);
+            return ObjectRef(L, -1, false);
         }
 
         template <class T>

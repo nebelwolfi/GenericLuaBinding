@@ -19,6 +19,12 @@ namespace LuaBinding {
         int base;
     };
 
+    template <typename T>
+    concept has_lua_state = requires(T t)
+    {
+        { t.lua_state() } -> std::convertible_to<void*>;
+    };
+
     class Object {
     protected:
         int idx = LUA_REFNIL;
@@ -31,19 +37,14 @@ namespace LuaBinding {
         }
         ~Object() = default;
 
-        const char* tostring()
+        virtual const char* tostring()
         {
             return lua_tostring(L, idx);
         }
 
-        const char* tolstring()
+        virtual const char* tolstring()
         {
-            lua_getglobal(L, "tostring");
-            push();
-            LuaBinding::pcall(L, 1, 1);
-            auto result = lua_tostring(L, -1);
-            lua_pop(L, 1);
-            return result;
+            return luaL_tolstring(L, -1, nullptr);
         }
 
         template<typename T>
@@ -93,38 +94,39 @@ namespace LuaBinding {
             return lua_topointer(L, idx);
         }
 
-        virtual Object operator[](size_t index)
-        {
-            lua_geti(L, this->idx, index);
-            return Object(L, lua_gettop(L));
-        }
-
-        virtual Object operator[](const char* index)
-        {
-            lua_getfield(L, this->idx, index);
-            return Object(L, lua_gettop(L));
-        }
-
-        virtual int push() const
+        virtual int push(int i = -1) const
         {
             lua_pushvalue(L, idx);
+            if (i != -1)
+                lua_insert(L, i);
             return 1;
         }
 
-        virtual void pop() const
-        {
-            lua_remove(L, idx);
-        }
-
-        virtual int push()
+        virtual int push(int i = -1)
         {
             lua_pushvalue(L, idx);
+            if (i != -1)
+                lua_insert(L, i);
             return 1;
         }
 
         virtual void pop() {
             lua_remove(L, idx);
             this->idx = LUA_REFNIL;
+        }
+
+        template<typename Ref = Object> requires std::is_base_of_v<Object, Ref>
+        Ref operator[](size_t index)
+        {
+            lua_geti(L, this->idx, index);
+            return Ref(L, lua_gettop(L));
+        }
+
+        template<typename Ref = ObjectRef> requires std::is_base_of_v<Object, Ref>
+        Ref operator[](const char* index)
+        {
+            lua_getfield(L, this->idx, index);
+            return Ref(L, lua_gettop(L));
         }
 
         template<typename R, bool C = false>
@@ -158,7 +160,7 @@ namespace LuaBinding {
             }
         }
 
-        template<typename R, bool C = false, typename ...Params> requires (!std::is_same_v<std::tuple_element_t<0, std::tuple<Params...>>, Environment>)
+        template<typename R, bool C = false, typename ...Params> requires (sizeof...(Params) > 0 && !std::is_same_v<std::tuple_element_t<0, std::tuple<Params...>>, Environment>)
         R call(Params... param) {
             push();
             if constexpr (sizeof...(param) > 0)
@@ -182,7 +184,7 @@ namespace LuaBinding {
             }
         }
 
-        template<int R, typename ...Params> requires (!std::is_same_v<std::tuple_element_t<0, std::tuple<Params...>>, Environment>)
+        template<int R, typename ...Params> requires (sizeof...(Params) > 0 && !std::is_same_v<std::tuple_element_t<0, std::tuple<Params...>>, Environment>)
         void call(Params... param) {
             push();
             if constexpr (sizeof...(param) > 0)
@@ -226,6 +228,40 @@ namespace LuaBinding {
             {
                 throw std::exception(lua_tostring(L, -1));
             }
+        }
+
+        template<typename Ref = ObjectRef> requires std::is_base_of_v<ObjectRef, Ref>
+        Ref operator() () {
+            push();
+            if (LuaBinding::pcall(L, 0, 1))
+            {
+                throw std::exception(lua_tostring(L, -1));
+            }
+            return Ref(L, -1, false);
+        }
+
+        template<typename Ref = ObjectRef, typename ...Params> requires (std::is_base_of_v<ObjectRef, Ref>) && (sizeof...(Params) > 0 && !std::is_same_v<std::tuple_element_t<0, std::tuple<Params...>>, Environment>)
+        Ref operator() (Params... param) {
+            push();
+            if constexpr (sizeof...(param) > 0)
+                (void)std::initializer_list<int>{ detail::push(L, param)... };
+            if (LuaBinding::pcall(L, sizeof...(param), 1))
+            {
+                throw std::exception(lua_tostring(L, -1));
+            }
+            return Ref(L, -1, false);
+        }
+
+        template<typename Ref = ObjectRef, typename Env, typename ...Params> requires (std::is_same_v<Env, Environment>)
+        Ref operator()(Env env, Params... param) {
+            push();
+            if constexpr (sizeof...(param) > 0)
+                (void)std::initializer_list<int>{ detail::push(L, param)... };
+            if (env.pcall(sizeof...(param), 1))
+            {
+                throw std::exception(lua_tostring(L, -1));
+            }
+            return Ref(L, -1, false);
         }
 
         template <typename T>
@@ -303,14 +339,32 @@ namespace LuaBinding {
             return lua_type(L, idx);
         }
 
-        bool valid() const
+        bool valid(lua_State *S)
         {
-            return L && this->idx != LUA_REFNIL;
+            return S && L == S && this->idx != LUA_REFNIL;
         }
 
-        bool valid()
+        bool valid(lua_State *S) const
         {
-            return L && this->idx != LUA_REFNIL;
+            return L && L == S && this->idx != LUA_REFNIL;
+        }
+
+        template <typename T>
+        bool valid(T *S) requires has_lua_state<T>
+        {
+            return S && L == S->lua_state() && this->idx != LUA_REFNIL;
+        }
+
+        template <typename T>
+        bool valid(T *S) const requires has_lua_state<T>
+        {
+            return L && L == S->lua_state() && this->idx != LUA_REFNIL;
+        }
+
+        void invalidate()
+        {
+            L = nullptr;
+            this->idx = LUA_REFNIL;
         }
 
         virtual int len()
@@ -349,7 +403,7 @@ namespace LuaBinding {
         ObjectRef(const Object& other)
         {
             this->L = other.lua_state();
-            if (other.valid())
+            if (other.valid(L))
             {
                 other.push();
                 this->idx = luaL_ref(L, LUA_REGISTRYINDEX);
@@ -357,7 +411,7 @@ namespace LuaBinding {
         }
         ObjectRef& operator=(Object&& other) noexcept {
             this->L = other.lua_state();
-            if (other.valid())
+            if (other.valid(L))
             {
                 other.push();
                 this->idx = luaL_ref(L, LUA_REGISTRYINDEX);
@@ -367,7 +421,7 @@ namespace LuaBinding {
         ObjectRef(const ObjectRef& other)
         {
             this->L = other.lua_state();
-            if (other.valid())
+            if (other.valid(L))
             {
                 other.push();
                 this->idx = luaL_ref(L, LUA_REGISTRYINDEX);
@@ -375,7 +429,7 @@ namespace LuaBinding {
         }
         ObjectRef& operator=(ObjectRef&& other) noexcept {
             this->L = other.lua_state();
-            if (other.valid())
+            if (other.valid(L))
             {
                 other.push();
                 this->idx = luaL_ref(L, LUA_REGISTRYINDEX);
@@ -383,12 +437,40 @@ namespace LuaBinding {
             return *this;
         }
         ~ObjectRef() {
-            if (valid())
+            if (valid(L))
             {
                 luaL_unref(L, LUA_REGISTRYINDEX, idx);
                 idx = LUA_REFNIL;
                 L = nullptr;
             }
+        }
+
+        const char* tostring() override
+        {
+            push();
+            auto result = lua_tostring(L, -1);
+            lua_pop(L, 1);
+            return result;
+        }
+
+        const char* tolstring() override
+        {
+            push();
+            auto result = luaL_tolstring(L, -1, nullptr);
+            lua_pop(L, 1);
+            return result;
+        }
+
+        template <class T>
+        operator T () const
+        {
+            return as <T> ();
+        }
+
+        template <class T>
+        operator T ()
+        {
+            return as <T> ();
         }
 
         template<typename T>
@@ -425,6 +507,24 @@ namespace LuaBinding {
             return b;
         }
 
+        template<typename Ref = ObjectRef> requires std::is_base_of_v<ObjectRef, Ref>
+        Ref operator[](size_t idx)
+        {
+            lua_rawgeti(L, LUA_REGISTRYINDEX, this->idx);
+            lua_geti(L, -1, idx);
+            lua_remove(L, -2);
+            return Ref(L, lua_gettop(L), false);
+        }
+
+        template<typename Ref = ObjectRef> requires std::is_base_of_v<ObjectRef, Ref>
+        Ref operator[](const char* idx)
+        {
+            lua_rawgeti(L, LUA_REGISTRYINDEX, this->idx);
+            lua_getfield(L, -1, idx);
+            lua_remove(L, -2);
+            return Ref(L, lua_gettop(L), false);
+        }
+
         [[nodiscard]] const void* topointer() const override
         {
             lua_rawgeti(L, LUA_REGISTRYINDEX, idx);
@@ -433,36 +533,19 @@ namespace LuaBinding {
             return t;
         }
 
-        Object operator[](size_t idx) override
-        {
-            lua_rawgeti(L, LUA_REGISTRYINDEX, this->idx);
-            lua_geti(L, -1, idx);
-            lua_remove(L, -2);
-            return Object(L, lua_gettop(L));
-        }
-
-        Object operator[](const char* idx) override
-        {
-            lua_rawgeti(L, LUA_REGISTRYINDEX, this->idx);
-            lua_getfield(L, -1, idx);
-            lua_remove(L, -2);
-            return Object(L, lua_gettop(L));
-        }
-
-        int push() const override
+        int push(int i = -1) const override
         {
             lua_rawgeti(L, LUA_REGISTRYINDEX, idx);
+            if (i != -1)
+                lua_insert(L, i);
             return 1;
         }
 
-        void pop() const override
-        {
-            luaL_unref(L, LUA_REGISTRYINDEX, idx);
-        }
-
-        int push() override
+        int push(int i = -1) override
         {
             lua_rawgeti(L, LUA_REGISTRYINDEX, idx);
+            if (i != -1)
+                lua_insert(L, i);
             return 1;
         }
 

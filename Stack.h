@@ -4,7 +4,7 @@
 #include <optional>
 #include <vector>
 #include <unordered_map>
-#include "Object.h"
+#include "LuaBinding.h"
 
 namespace LuaBinding {
     template<typename T>
@@ -380,7 +380,7 @@ namespace LuaBinding {
         }
         static T get(lua_State* L, int index)
         {
-            return lua_tostring(L, index);
+            return (T)luaL_tolstring(L, index, nullptr);
         }
         static const char* type_name(lua_State* L) {
             return "string";
@@ -432,7 +432,7 @@ namespace LuaBinding {
         }
         static char* get(lua_State* L, int index)
         {
-            return (char*)lua_tostring(L, index);
+            return (char*)luaL_tolstring(L, index, nullptr);
         }
         static const char* type_name(lua_State* L) {
             return "string";
@@ -458,7 +458,7 @@ namespace LuaBinding {
         }
         static const char* get(lua_State* L, int index)
         {
-            return lua_tostring(L, index);
+            return luaL_tolstring(L, index, nullptr);
         }
         static const char* type_name(lua_State* L) {
             return "string";
@@ -484,9 +484,8 @@ namespace LuaBinding {
         }
         static std::string get(lua_State* L, int index)
         {
-            size_t len = 0;
-            std::string str = { lua_tolstring(L, index, &len), len };
-            return str;
+            size_t len;
+            return { luaL_tolstring(L, index, &len), len };
         }
         static const char* type_name(lua_State* L) {
             return "string";
@@ -548,6 +547,15 @@ namespace LuaBinding {
         }
     };
 
+    template<typename Param>
+    int snp(lua_State *L, char* buff) {
+        if constexpr (detail::is_pushable<Param>)
+            snprintf(buff, 1000, strlen(buff) > 6 ? "%s, %s" : "%s%s", buff, Stack<Param>::type_name(L));
+        else
+            snprintf(buff, 1000, strlen(buff) > 6 ? "%s, %s" : "%s%s", buff, StackClass<Param>::type_name(L));
+        return 0;
+    };
+
     template<typename ...Params>
     class Stack<std::tuple<Params...>> {
     public:
@@ -583,13 +591,7 @@ namespace LuaBinding {
             static char buff[1000] = { '\0' };
             if (buff[0]) return buff;
             snprintf(buff, 1000, "table{");
-            auto snp = [L]<typename Param>() {
-                if constexpr (detail::is_pushable<Param>)
-                    snprintf(buff, 1000, "%s, %s", Stack<Param>::type_name(L));
-                else
-                    snprintf(buff, 1000, "%s, %s", StackClass<Param>::type_name(L));
-            };
-            //(void)std::initializer_list<int> { snp<Params>()... };
+            (void)std::initializer_list<int> { snp<Params>(L, buff)... };
             snprintf(buff, 1000, "%s}", buff);
             return buff;
         }
