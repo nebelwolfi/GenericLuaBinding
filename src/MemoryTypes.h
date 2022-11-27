@@ -1,4 +1,5 @@
 #pragma once
+#ifdef LUABINDING_DYN_CLASSES
 namespace LuaBinding {
     enum MemoryType {
         _char = -0x1,
@@ -28,3 +29,4 @@ namespace LuaBinding {
     int lua_pullmemtype(lua_State* L, MemoryType type, void* addr);
     size_t get_type_size(MemoryType mt);
 }
+#endif

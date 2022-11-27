@@ -1,4 +1,5 @@
 #pragma once
+#ifdef LUABINDING_DYN_CLASSES
 #include <functional>
 #include <cassert>
 #include "MemoryTypes.h"
@@ -449,3 +450,4 @@ namespace LuaBinding {
         }
     };
 }
+#endif

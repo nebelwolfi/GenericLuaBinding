@@ -20,7 +20,7 @@
 
 ### 🎈 Compatability <a name="compatability"></a>
 
-Tested against LuaJIT 2.1 and Lua 5.4, will happily fix compats with other versions - simply open an issue
+Tested against LuaJIT 2.1 x86 and Lua 5.4 x86, will happily fix compats with other versions - simply open an issue
 
 ## 🔧 Quick and Dirty <a name="quick_and_dirty"></a>
 ```cpp

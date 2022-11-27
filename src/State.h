@@ -1,6 +1,7 @@
 #pragma once
-
+#ifdef LUABINDING_DYN_CLASSES
 #include "DynClass.h"
+#endif
 #include "Object.h"
 #include "Stack.h"
 #include "Class.h"
@@ -20,6 +21,7 @@ namespace LuaBinding {
         lua_State* L = nullptr;
         bool view = false;
 
+#ifdef LUABINDING_DYN_CLASSES
         std::vector<DynClass*>* get_dynamic_classes() {
             lua_getglobal(L, "__DATASTORE");
             lua_getfield(L, -1, "dynamic_class_store");
@@ -27,6 +29,7 @@ namespace LuaBinding {
             lua_pop(L, 2);
             return p;
         }
+#endif
 
     public:
         State() = default;
@@ -77,10 +80,12 @@ namespace LuaBinding {
 
         ~State() {
             if (!view) {
+#ifdef LUABINDING_DYN_CLASSES
                 for (auto& c : *get_dynamic_classes())
                     delete c;
                 get_dynamic_classes()->clear();
                 delete get_dynamic_classes();
+#endif
                 lua_close(L);
                 L = nullptr;
             }
@@ -108,11 +113,13 @@ namespace LuaBinding {
             return Class<T>(L, name);
         }
 
+#ifdef LUABINDING_DYN_CLASSES
         int addDynClass(const char* name)
         {
             get_dynamic_classes()->push_back(new DynClass(this->L, name));
             return 1;
         }
+#endif
 
         Environment addEnv()
         {
