@@ -139,6 +139,7 @@ Class
 Object     // on stack
 ObjectRef  // stored in registry
 Env        // from State::addEnv
+IndexProxy // from obj[] or state[]
   tostring() -> const char*           // calls lua_tostring()
   tolstring() -> const char*          // calls tostring(o) in lua and returns the result
   as<T>() -> T                        // retrieves value from lua
@@ -159,6 +160,11 @@ Env        // from State::addEnv
   index() -> int                      // stack/registry index
   type() -> int                       // LUA_T...
   valid() -> bool                     // checks if obj is still valid
+  valid(t) -> bool                    // checks if obj is still valid and of lua type t
+  valid(State) -> bool                // checks if obj is still valid in a State
+  valid(L) -> bool                    // checks if obj is still valid in a lua State
+  valid(State, t) -> bool             // checks if obj is still valid in a State and of lua type t
+  valid(L, t) -> bool                 // checks if obj is still valid in a lua State and of lua type t
   len() -> int                        // table length or udata size
 ```
 Lua C Function formats supported by cfunc calls:
