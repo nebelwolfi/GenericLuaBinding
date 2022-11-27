@@ -215,10 +215,21 @@ namespace LuaBinding {
         }
         static T get(lua_State* L, int index) requires (std::is_convertible_v<T, void*>)
         {
+            if (!is(L, index))
+            {
+                if constexpr (std::is_convertible_v<T, void*>)
+                    if (lua_isnoneornil(L, index))
+                        return nullptr;
+                luaL_typeerror(L, index, type_name(L));
+            }
             return *(T*)lua_touserdata(L, index);
         }
         static T get(lua_State* L, int index) requires (!std::is_convertible_v<T, void*>)
         {
+            if (!is(L, index))
+            {
+                luaL_typeerror(L, index, type_name(L));
+            }
             return **(T**)lua_touserdata(L, index);
         }
     };
