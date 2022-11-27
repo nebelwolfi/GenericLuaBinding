@@ -346,12 +346,12 @@ namespace LuaBinding {
         };
 
         template <typename T>
-        concept is_pushable_fun = (std::is_function_v<std::remove_pointer_t<T>> || std::is_member_function_pointer_v<std::remove_pointer_t<T>> || has_call_operator<T>) && requires (T t) {
+        concept is_pushable_fun = (std::is_function_v<std::remove_pointer_t<T>> || has_call_operator<T>) && requires (T t) {
             { Function::fun<void>(nullptr, t) };
         };
 
         template <typename T>
-        concept is_pushable_cfun = (std::is_function_v<std::remove_pointer_t<T>> || std::is_member_function_pointer_v<std::remove_pointer_t<T>> || has_call_operator<T>) && requires (T t) {
+        concept is_pushable_cfun = (std::is_function_v<std::remove_pointer_t<T>> || has_call_operator<T>) && requires (T t) {
             { Function::cfun<void>(nullptr, t) };
         };
     }
