@@ -68,19 +68,19 @@ int main() {
 ```cpp
 void my_print(LuaBinding::State S) {
   std::string out;
-  // get global tostring
-  auto tostring = S.at("tostring");
   // iterate over args from 1 -> argn
   for (auto o : S) {
-    if (o.is<std::string>()) {
-      out += o.as<std::string>();
-    } else {
-      // could also use o.tolstring() instead
-      out += tostring.call<std::string>(o);
-    }
+    out += o.as<std::string>();
     out += "\t";
   }
   printf("%s", out.c_str());
+}
+
+int printf(lua_State *L) {
+  auto S = LuaBinding::State(L);
+  S["string"]["format"].push(1);
+  LuaBinding::pcall(L, S.n() - 1, 1);
+  return print(L);
 }
 
 int luaopen_mylib(lua_State *L) {
@@ -92,9 +92,9 @@ int luaopen_mylib(lua_State *L) {
   CLib.set("name", "CLib");
 
   // set func
-  CLib.fun("printf", [](LuaBinding::Object o){ printf("%s", o.tolstring()); });
+  CLib.fun("print", my_print);
   // can also do it like this
-  S.fun("CLib.print", my_print);
+  S.cfun("CLib.printf", printf);
 
   // push it to stack as return value
   S.at("CLib").push();
