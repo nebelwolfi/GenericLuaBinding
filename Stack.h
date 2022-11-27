@@ -4,7 +4,7 @@
 #include <optional>
 #include <vector>
 #include <unordered_map>
-#include "LuaBinding.h"
+#include "Object.h"
 
 namespace LuaBinding {
     template<typename T>
