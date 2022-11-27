@@ -1,10 +1,14 @@
 #pragma once
-#include "Object.h"
 #include "Stack.h"
+
 #include <functional>
 #include <tuple>
 
 namespace LuaBinding {
+    class Object;
+    class ObjectRef;
+    class Environment;
+
     namespace FunctionDetail
     {
         template <typename F>
@@ -348,44 +352,43 @@ namespace LuaBinding {
     };
 
     namespace detail {
-        template<class T>
-        int fun(lua_State* L, T& t)
+        template<typename F>
+        concept has_call_operator = requires (F) {
+            &F::operator();
+        };
+
+        template <typename T>
+        concept is_pushable_fun = (std::is_function_v<std::remove_pointer_t<T>> || std::is_member_function_pointer_v<std::remove_pointer_t<T>> || std::is_member_object_pointer_v<std::remove_pointer_t<T>> || has_call_operator<T>) && requires (T t) {
+            { Function::fun<void>(nullptr, t) } -> std::same_as<void>;
+        };
+
+        template <typename T>
+        concept is_pushable_cfun = (std::is_function_v<std::remove_pointer_t<T>> || std::is_member_function_pointer_v<std::remove_pointer_t<T>> || std::is_member_object_pointer_v<std::remove_pointer_t<T>> || has_call_operator<T>) && requires (T t) {
+            { Function::cfun<void>(nullptr, t) } -> std::same_as<void>;
+        };
+
+        template<class T> requires (is_pushable_fun<T>)
+        int push(lua_State* L, T&& t)
         {
-            if constexpr(disect_function<T>::isClass)
-                Function::fun<decltype(disect_function<T>::classT)>(L, t);
-            else
-                Function::fun<void>(L, t);
-            return 1;
+            return Function::fun<void>(L, t);
         }
 
-        template<class T>
-        int fun(lua_State* L, T&& t)
+        template<class T> requires (is_pushable_fun<T>)
+        int push(lua_State* L, T& t)
         {
-            if constexpr(disect_function<T>::isClass)
-                Function::fun<decltype(disect_function<T>::classT)>(L, t);
-            else
-                Function::fun<void>(L, t);
-            return 1;
+            return Function::fun<void>(L, t);
         }
 
-        template<class T>
-        int cfun(lua_State* L, T& t)
+        template<class T> requires (is_pushable_cfun<T>)
+        int push(lua_State* L, T&& t)
         {
-            if constexpr(disect_function<T>::isClass)
-                Function::cfun<decltype(*disect_function<T>::classT)>(L, t);
-            else
-                Function::cfun<void>(L, t);
-            return 1;
+            return Function::cfun<void>(L, t);
         }
 
-        template<class T>
-        int cfun(lua_State* L, T&& t)
+        template<class T> requires (is_pushable_cfun<T>)
+        int push(lua_State* L, T& t)
         {
-            if constexpr(disect_function<T>::isClass)
-                Function::cfun<decltype(*disect_function<T>::classT)>(L, t);
-            else
-                Function::cfun<void>(L, t);
-            return 1;
+            return Function::cfun<void>(L, t);
         }
     }
 }

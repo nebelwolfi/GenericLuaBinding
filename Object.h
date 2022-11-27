@@ -1,9 +1,11 @@
 #pragma once
 #include "Stack.h"
+#include "Function.h"
 
 namespace LuaBinding {
     class Environment;
     class ObjectRef;
+    class IndexProxy;
     template<typename T>
     class TableIter
     {
@@ -115,18 +117,26 @@ namespace LuaBinding {
             this->idx = LUA_REFNIL;
         }
 
-        template<typename Ref = Object> requires std::is_base_of_v<Object, Ref>
+        template<typename Ref = ObjectRef> requires std::is_base_of_v<ObjectRef, Ref>
         Ref operator[](size_t index)
         {
             lua_geti(L, this->idx, index);
-            return Ref(L, lua_gettop(L));
+            return Ref(L, lua_gettop(L), false);
         }
 
-        template<typename Ref = ObjectRef> requires std::is_base_of_v<Object, Ref>
+        template<typename Ref = ObjectRef> requires std::is_base_of_v<ObjectRef, Ref>
         Ref operator[](const char* index)
         {
             lua_getfield(L, this->idx, index);
-            return Ref(L, lua_gettop(L));
+            return Ref(L, lua_gettop(L), false);
+        }
+
+        template<typename T>
+        Object& operator=(T value)
+        {
+            detail::push(L, value);
+            lua_replace(L, idx);
+            return *this;
         }
 
         template<typename R, bool C = false>
@@ -284,10 +294,46 @@ namespace LuaBinding {
         }
 
         template <typename T>
+        void fun(int index, T& other)
+        {
+            push();
+            Function::fun<void>(L, other);
+            lua_rawseti(L, -2, index);
+            lua_pop(L, 1);
+        }
+
+        template <typename T>
+        void fun(int index, T&& other)
+        {
+            push();
+            Function::fun<void>(L, other);
+            lua_rawseti(L, -2, index);
+            lua_pop(L, 1);
+        }
+
+        template <typename T>
+        void cfun(int index, T& other)
+        {
+            push();
+            Function::cfun<void>(L, other);
+            lua_rawseti(L, -2, index);
+            lua_pop(L, 1);
+        }
+
+        template <typename T>
+        void cfun(int index, T&& other)
+        {
+            push();
+            Function::cfun<void>(L, other);
+            lua_rawseti(L, -2, index);
+            lua_pop(L, 1);
+        }
+
+        template <typename T>
         void fun(const char* index, T& other)
         {
             push();
-            detail::fun(L, other);
+            Function::fun<void>(L, other);
             lua_setfield(L, -2, index);
             lua_pop(L, 1);
         }
@@ -296,7 +342,7 @@ namespace LuaBinding {
         void fun(const char* index, T&& other)
         {
             push();
-            detail::fun(L, other);
+            Function::fun<void>(L, other);
             lua_setfield(L, -2, index);
             lua_pop(L, 1);
         }
@@ -305,7 +351,7 @@ namespace LuaBinding {
         void cfun(const char* index, T& other)
         {
             push();
-            detail::cfun(L, other);
+            Function::cfun<void>(L, other);
             lua_setfield(L, -2, index);
             lua_pop(L, 1);
         }
@@ -314,7 +360,7 @@ namespace LuaBinding {
         void cfun(const char* index, T&& other)
         {
             push();
-            detail::cfun(L, other);
+            Function::cfun<void>(L, other);
             lua_setfield(L, -2, index);
             lua_pop(L, 1);
         }
@@ -369,7 +415,7 @@ namespace LuaBinding {
 
         virtual int len()
         {
-            return get_len(L, idx);
+            return lua_getlen(L, idx);
         }
 
         TableIter<ObjectRef> begin()
@@ -378,7 +424,7 @@ namespace LuaBinding {
         }
         TableIter<ObjectRef> end()
         {
-            return TableIter<ObjectRef>(L, get_len(L, idx) + 1, this->idx);
+            return TableIter<ObjectRef>(L, lua_getlen(L, idx) + 1, this->idx);
         }
         TableIter<ObjectRef> begin() const
         {
@@ -386,7 +432,7 @@ namespace LuaBinding {
         }
         TableIter<ObjectRef> end() const
         {
-            return TableIter<ObjectRef>(L, get_len(L, idx) + 1, this->idx);
+            return TableIter<ObjectRef>(L, lua_getlen(L, idx) + 1, this->idx);
         }
     };
 
@@ -476,7 +522,7 @@ namespace LuaBinding {
         template<typename T>
         T as()
         {
-            lua_rawgeti(L, LUA_REGISTRYINDEX, idx);
+            push();
             auto t = detail::get<T>(L, -1);
             lua_pop(L, 1);
             return t;
@@ -487,12 +533,12 @@ namespace LuaBinding {
         {
             if constexpr (std::is_same_v<T, void>)
             {
-                lua_rawgeti(L, LUA_REGISTRYINDEX, idx);
+                push();
                 auto t = lua_isnoneornil(L, -1);
                 lua_pop(L, 1);
                 return t;
             } else {
-                lua_rawgeti(L, LUA_REGISTRYINDEX, idx);
+                push();
                 auto t = detail::is<T>(L, -1);
                 lua_pop(L, 1);
                 return t;
@@ -501,33 +547,27 @@ namespace LuaBinding {
 
         bool is(int t) override
         {
-            lua_rawgeti(L, LUA_REGISTRYINDEX, idx);
+            push();
             auto b = lua_type(L, -1) == t;
             lua_pop(L, 1);
             return b;
         }
 
-        template<typename Ref = ObjectRef> requires std::is_base_of_v<ObjectRef, Ref>
-        Ref operator[](size_t idx)
+        template<typename IP = IndexProxy> requires std::is_base_of_v<IP, IndexProxy>
+        IP operator[](size_t idx)
         {
-            lua_rawgeti(L, LUA_REGISTRYINDEX, this->idx);
-            lua_geti(L, -1, idx);
-            lua_remove(L, -2);
-            return Ref(L, lua_gettop(L), false);
+            return IP(*this, idx);
         }
 
-        template<typename Ref = ObjectRef> requires std::is_base_of_v<ObjectRef, Ref>
-        Ref operator[](const char* idx)
+        template<typename IP = IndexProxy> requires std::is_base_of_v<IP, IndexProxy>
+        IP operator[](const char* idx)
         {
-            lua_rawgeti(L, LUA_REGISTRYINDEX, this->idx);
-            lua_getfield(L, -1, idx);
-            lua_remove(L, -2);
-            return Ref(L, lua_gettop(L), false);
+            return IP(*this, idx);
         }
 
         [[nodiscard]] const void* topointer() const override
         {
-            lua_rawgeti(L, LUA_REGISTRYINDEX, idx);
+            push();
             auto t = lua_topointer(L, -1);
             lua_pop(L, 1);
             return t;
@@ -557,7 +597,7 @@ namespace LuaBinding {
 
         int type() override
         {
-            lua_rawgeti(L, LUA_REGISTRYINDEX, this->idx);
+            push();
             auto t = lua_type(L, -1);
             lua_pop(L, 1);
             return t;
@@ -565,10 +605,89 @@ namespace LuaBinding {
 
         int len() override
         {
-            lua_rawgeti(L, LUA_REGISTRYINDEX, this->idx);
-            auto t = get_len(L, -1);
+            push();
+            auto t = lua_getlen(L, -1);
             lua_pop(L, 1);
             return t;
+        }
+    };
+
+    class IndexProxy : ObjectRef {
+    protected:
+        ObjectRef& element;
+        const char* str_index;
+        int int_index;
+
+    public:
+        IndexProxy(ObjectRef& el, const char* str_index) : element(el), str_index(str_index), int_index(-1) {}
+        IndexProxy(ObjectRef& el, int int_index) : element(el), str_index(nullptr), int_index(int_index) {}
+
+        operator ObjectRef () const {
+            element.push();
+            if (str_index)
+                lua_getfield(element.lua_state(), -1, str_index);
+            else
+                lua_rawgeti(element.lua_state(), -1, int_index);
+            lua_remove(element.lua_state(), -2);
+            return ObjectRef(element.lua_state(), -1, false);
+        }
+
+        int push(int i = -1) const override
+        {
+            element.push();
+            if (str_index)
+                lua_getfield(element.lua_state(), -1, str_index);
+            else
+                lua_rawgeti(element.lua_state(), -1, int_index);
+            lua_remove(element.lua_state(), -2);
+            if (i != -1)
+                lua_insert(element.lua_state(), i);
+            return 1;
+        }
+
+        int push(int i = -1) override
+        {
+            element.push();
+            if (str_index)
+                lua_getfield(element.lua_state(), -1, str_index);
+            else
+                lua_rawgeti(element.lua_state(), -1, int_index);
+            lua_remove(element.lua_state(), -2);
+            if (i != -1)
+                lua_insert(element.lua_state(), i);
+            return 1;
+        }
+
+        void pop() override
+        {
+            element.push();
+            lua_pushnil(element.lua_state());
+            if (str_index)
+                lua_setfield(element.lua_state(), -2, str_index);
+            else
+                lua_rawseti(element.lua_state(), -2, int_index);
+            lua_pop(element.lua_state(), 1);
+        }
+
+        template <typename T>
+        IndexProxy& operator=(const T& rhs) {
+            if constexpr (detail::is_pushable_cfun<T>) {
+                if (int_index == -1)
+                    element.cfun(str_index, rhs);
+                else
+                    element.cfun(int_index, rhs);
+            } else if constexpr (detail::is_pushable_fun<T>) {
+                if (int_index == -1)
+                    element.fun(str_index, rhs);
+                else
+                    element.fun(int_index, rhs);
+            } else {
+                if (int_index == -1)
+                    element.set(str_index, rhs);
+                else
+                    element.set(int_index, rhs);
+            }
+            return *this;
         }
     };
 

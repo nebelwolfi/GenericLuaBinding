@@ -1,4 +1,4 @@
-<h1 align="center">Generic Lua Binding</h3>
+<h1 align="center">Generic Header-Only Lua Binding</h1>
 
 <div align="center">
 
@@ -35,29 +35,23 @@ int main() {
   S->addClass<Sprite>("Sprite")
     .ctor<std::string>()
     .prop_fun("size", &LuaSprite::GetSize)
-    .prop_fun("width", []](LuaSprite* self){ return self->GetSize().x; })
+    .prop_fun("width", [](LuaSprite* self){ return self->GetSize().x; })
     .prop("info", &LuaSprite::info)
     .fun("draw", &LuaSprite::Draw);
-
-  S->exec(R"(
-    local s = Sprite("icon.png")
-    print(s.width)
-    s:draw()
-  )");
 
   auto env = S->addEnv();
   env.set("var", 1);
 
   try {
-    S->exec(env, R"(
-      print(var) -- 1
-      var = 2
-    )");
-    S->exec(env, R"(
-      print(var) -- 2
-    )");
+    // execute
     S->exec(R"(
-      print(var) -- nil
+      local s = Sprite("icon.png")
+      print(s.width)
+      s:draw()
+    )");
+    // or execute with env
+    S->exec(env, R"(
+      print(var)
     )");
   } catch (std::exception& e) {
     printf("Lua Error: %s", e.what());
@@ -126,6 +120,8 @@ State:
   at(index : string) -> ObjectRef     // returns ObjectRef at global index
   table(index : string) -> ObjectRef  // ^ and creates it as table if it does not exist
   global(name, t)                     // sets t global
+  front() -> Object                   // Object at stack index 1
+  top() -> Object                     // Object at stack index -1
 
 Class
   ctor<params...>()                   // allows lua to call the constructor

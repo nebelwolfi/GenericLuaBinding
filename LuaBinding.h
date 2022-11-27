@@ -61,7 +61,7 @@
                 return 0;
         };
     }
-    inline int get_len(lua_State* L, int idx)
+    inline int lua_getlen(lua_State* L, int idx)
     {
         return int(lua_objlen(L, idx));
     }
@@ -97,7 +97,7 @@
         return lua_type(L, -1);
     }
 #else
-    inline int get_len(lua_State* L, int idx)
+    inline int lua_getlen(lua_State* L, int idx)
     {
         return lua_rawlen(L, idx);
     }
