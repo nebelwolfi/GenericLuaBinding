@@ -381,7 +381,7 @@ namespace LuaBinding {
             return lua_gettop(L);
         }
 
-        template<typename R, bool C = false, typename ...Params> requires (!std::is_same_v<std::tuple_element_t<0, std::tuple<Params...>>, Environment>)
+        template<typename R, bool C = false, typename ...Params> requires (sizeof...(Params) == 0 || !std::is_same_v<std::tuple_element_t<0, std::tuple<Params...>>, Environment>)
         R call(Params... param) {
             if constexpr (sizeof...(param) > 0)
                 (void)std::initializer_list<int>{ push(param...) };
@@ -416,7 +416,7 @@ namespace LuaBinding {
             }
         }
 
-        template<int R, typename ...Params> requires (!std::is_same_v<std::tuple_element_t<0, std::tuple<Params...>>, Environment>)
+        template<int R, typename ...Params> requires (sizeof...(Params) == 0 || !std::is_same_v<std::tuple_element_t<0, std::tuple<Params...>>, Environment>)
         void call(Params... param) {
             if constexpr (sizeof...(param) > 0)
                 (void)std::initializer_list<int>{ detail::push(L, param)... };

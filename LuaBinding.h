@@ -1398,7 +1398,7 @@ namespace LuaBinding {
                 if constexpr(disect_function<decltype(f)>::nargs > 0)
                     LoopTupleT<decltype(f)>(L);
 
-                lua_pushinteger(L, lua_objlen(L, -1));
+                lua_pushinteger(L, lua_getlen(L, -1));
                 lua_setfield(L, -3, "nargs");
 
                 lua_setfield(L, -2, "argl");
@@ -1459,6 +1459,38 @@ namespace LuaBinding {
     };
 
     namespace detail {
+        namespace _resolve {
+            template <typename Sig, typename C>
+            inline Sig C::* resolve_v(std::false_type, Sig C::* mem_func_ptr) {
+                return mem_func_ptr;
+            }
+
+            template <typename Sig, typename C>
+            inline Sig C::* resolve_v(std::true_type, Sig C::* mem_variable_ptr) {
+                return mem_variable_ptr;
+            }
+        }
+
+        template <typename... Args, typename R>
+        inline auto resolve(R fun_ptr(Args...))->R(*)(Args...) {
+            return fun_ptr;
+        }
+
+        template <typename Sig>
+        inline Sig* resolve(Sig* fun_ptr) {
+            return fun_ptr;
+        }
+
+        template <typename... Args, typename R, typename C>
+        inline auto resolve(R(C::* mem_ptr)(Args...))->R(C::*)(Args...) {
+            return mem_ptr;
+        }
+
+        template <typename Sig, typename C>
+        inline Sig C::* resolve(Sig C::* mem_ptr) {
+            return _resolve::resolve_v(std::is_member_object_pointer<Sig C::*>(), mem_ptr);
+        }
+
         template<typename F>
         concept has_call_operator = requires (F) {
             &F::operator();
@@ -1870,9 +1902,24 @@ namespace LuaBinding {
             return lua_type(L, idx);
         }
 
+        virtual int type() const
+        {
+            return lua_type(L, idx);
+        }
+
+        bool valid()
+        {
+            return L && this->idx != LUA_REFNIL;
+        }
+
+        bool valid() const
+        {
+            return L && this->idx != LUA_REFNIL;
+        }
+
         bool valid(lua_State *S)
         {
-            return S && L == S && this->idx != LUA_REFNIL;
+            return L && L == S && this->idx != LUA_REFNIL;
         }
 
         bool valid(lua_State *S) const
@@ -1883,13 +1930,45 @@ namespace LuaBinding {
         template <typename T>
         bool valid(T *S) requires has_lua_state<T>
         {
-            return S && L == S->lua_state() && this->idx != LUA_REFNIL;
+            return L && L == S->lua_state() && this->idx != LUA_REFNIL;
         }
 
         template <typename T>
         bool valid(T *S) const requires has_lua_state<T>
         {
             return L && L == S->lua_state() && this->idx != LUA_REFNIL;
+        }
+
+        bool valid(int ltype)
+        {
+            return L && this->idx != LUA_REFNIL && type() == ltype;
+        }
+
+        bool valid(int ltype) const
+        {
+            return L && this->idx != LUA_REFNIL && type() == ltype;
+        }
+
+        bool valid(lua_State *S, int ltype)
+        {
+            return L && L == S && this->idx != LUA_REFNIL && type() == ltype;
+        }
+
+        bool valid(lua_State *S, int ltype) const
+        {
+            return L && L == S && this->idx != LUA_REFNIL && type() == ltype;
+        }
+
+        template <typename T>
+        bool valid(T *S, int ltype) requires has_lua_state<T>
+        {
+            return L && L == S->lua_state() && this->idx != LUA_REFNIL && type() == ltype;
+        }
+
+        template <typename T>
+        bool valid(T *S, int ltype) const requires has_lua_state<T>
+        {
+            return L && L == S->lua_state() && this->idx != LUA_REFNIL && type() == ltype;
         }
 
         void invalidate()
@@ -1899,6 +1978,11 @@ namespace LuaBinding {
         }
 
         virtual int len()
+        {
+            return lua_getlen(L, idx);
+        }
+
+        virtual int len() const
         {
             return lua_getlen(L, idx);
         }
@@ -2088,7 +2172,23 @@ namespace LuaBinding {
             return t;
         }
 
+        int type() const override
+        {
+            push();
+            auto t = lua_type(L, -1);
+            lua_pop(L, 1);
+            return t;
+        }
+
         int len() override
+        {
+            push();
+            auto t = lua_getlen(L, -1);
+            lua_pop(L, 1);
+            return t;
+        }
+
+        int len() const override
         {
             push();
             auto t = lua_getlen(L, -1);
@@ -4020,7 +4120,7 @@ namespace LuaBinding {
             return lua_gettop(L);
         }
 
-        template<typename R, bool C = false, typename ...Params> requires (!std::is_same_v<std::tuple_element_t<0, std::tuple<Params...>>, Environment>)
+        template<typename R, bool C = false, typename ...Params> requires (sizeof...(Params) == 0 || !std::is_same_v<std::tuple_element_t<0, std::tuple<Params...>>, Environment>)
         R call(Params... param) {
             if constexpr (sizeof...(param) > 0)
                 (void)std::initializer_list<int>{ push(param...) };
@@ -4055,7 +4155,7 @@ namespace LuaBinding {
             }
         }
 
-        template<int R, typename ...Params> requires (!std::is_same_v<std::tuple_element_t<0, std::tuple<Params...>>, Environment>)
+        template<int R, typename ...Params> requires (sizeof...(Params) == 0 || !std::is_same_v<std::tuple_element_t<0, std::tuple<Params...>>, Environment>)
         void call(Params... param) {
             if constexpr (sizeof...(param) > 0)
                 (void)std::initializer_list<int>{ detail::push(L, param)... };

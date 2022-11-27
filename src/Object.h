@@ -382,9 +382,24 @@ namespace LuaBinding {
             return lua_type(L, idx);
         }
 
+        virtual int type() const
+        {
+            return lua_type(L, idx);
+        }
+
+        bool valid()
+        {
+            return L && this->idx != LUA_REFNIL;
+        }
+
+        bool valid() const
+        {
+            return L && this->idx != LUA_REFNIL;
+        }
+
         bool valid(lua_State *S)
         {
-            return S && L == S && this->idx != LUA_REFNIL;
+            return L && L == S && this->idx != LUA_REFNIL;
         }
 
         bool valid(lua_State *S) const
@@ -395,13 +410,45 @@ namespace LuaBinding {
         template <typename T>
         bool valid(T *S) requires has_lua_state<T>
         {
-            return S && L == S->lua_state() && this->idx != LUA_REFNIL;
+            return L && L == S->lua_state() && this->idx != LUA_REFNIL;
         }
 
         template <typename T>
         bool valid(T *S) const requires has_lua_state<T>
         {
             return L && L == S->lua_state() && this->idx != LUA_REFNIL;
+        }
+
+        bool valid(int ltype)
+        {
+            return L && this->idx != LUA_REFNIL && type() == ltype;
+        }
+
+        bool valid(int ltype) const
+        {
+            return L && this->idx != LUA_REFNIL && type() == ltype;
+        }
+
+        bool valid(lua_State *S, int ltype)
+        {
+            return L && L == S && this->idx != LUA_REFNIL && type() == ltype;
+        }
+
+        bool valid(lua_State *S, int ltype) const
+        {
+            return L && L == S && this->idx != LUA_REFNIL && type() == ltype;
+        }
+
+        template <typename T>
+        bool valid(T *S, int ltype) requires has_lua_state<T>
+        {
+            return L && L == S->lua_state() && this->idx != LUA_REFNIL && type() == ltype;
+        }
+
+        template <typename T>
+        bool valid(T *S, int ltype) const requires has_lua_state<T>
+        {
+            return L && L == S->lua_state() && this->idx != LUA_REFNIL && type() == ltype;
         }
 
         void invalidate()
@@ -411,6 +458,11 @@ namespace LuaBinding {
         }
 
         virtual int len()
+        {
+            return lua_getlen(L, idx);
+        }
+
+        virtual int len() const
         {
             return lua_getlen(L, idx);
         }
@@ -600,7 +652,23 @@ namespace LuaBinding {
             return t;
         }
 
+        int type() const override
+        {
+            push();
+            auto t = lua_type(L, -1);
+            lua_pop(L, 1);
+            return t;
+        }
+
         int len() override
+        {
+            push();
+            auto t = lua_getlen(L, -1);
+            lua_pop(L, 1);
+            return t;
+        }
+
+        int len() const override
         {
             push();
             auto t = lua_getlen(L, -1);

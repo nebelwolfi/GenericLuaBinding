@@ -273,7 +273,7 @@ namespace LuaBinding {
                 if constexpr(disect_function<decltype(f)>::nargs > 0)
                     LoopTupleT<decltype(f)>(L);
 
-                lua_pushinteger(L, lua_objlen(L, -1));
+                lua_pushinteger(L, lua_getlen(L, -1));
                 lua_setfield(L, -3, "nargs");
 
                 lua_setfield(L, -2, "argl");
@@ -334,6 +334,38 @@ namespace LuaBinding {
     };
 
     namespace detail {
+        namespace _resolve {
+            template <typename Sig, typename C>
+            inline Sig C::* resolve_v(std::false_type, Sig C::* mem_func_ptr) {
+                return mem_func_ptr;
+            }
+
+            template <typename Sig, typename C>
+            inline Sig C::* resolve_v(std::true_type, Sig C::* mem_variable_ptr) {
+                return mem_variable_ptr;
+            }
+        }
+
+        template <typename... Args, typename R>
+        inline auto resolve(R fun_ptr(Args...))->R(*)(Args...) {
+            return fun_ptr;
+        }
+
+        template <typename Sig>
+        inline Sig* resolve(Sig* fun_ptr) {
+            return fun_ptr;
+        }
+
+        template <typename... Args, typename R, typename C>
+        inline auto resolve(R(C::* mem_ptr)(Args...))->R(C::*)(Args...) {
+            return mem_ptr;
+        }
+
+        template <typename Sig, typename C>
+        inline Sig C::* resolve(Sig C::* mem_ptr) {
+            return _resolve::resolve_v(std::is_member_object_pointer<Sig C::*>(), mem_ptr);
+        }
+
         template<typename F>
         concept has_call_operator = requires (F) {
             &F::operator();
