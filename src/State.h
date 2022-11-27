@@ -37,10 +37,12 @@ namespace LuaBinding {
             luaL_openlibs(L);
             lua_newtable(L);
             lua_setglobal(L, "__METASTORE");
+#ifdef LUABINDING_DYN_CLASSES
             lua_newtable(L);
             lua_pushlightuserdata(L, new std::vector<DynClass*>());
             lua_setfield(L, -2, "dynamic_class_store");
             lua_setglobal(L, "__DATASTORE");
+#endif
         }
         State(lua_State*L) : L(L), view(true) {
             lua_getglobal(L, "__METASTORE");
@@ -145,7 +147,6 @@ namespace LuaBinding {
             *u = t; *(u + 1) = (void*)0xC0FFEE;
             helper<std::remove_pointer_t<std::decay_t<T>>>::push_metatable(L);
             lua_setmetatable(L, -2);
-            lua_remove(L, -2);
             return t;
         }
 
@@ -158,7 +159,6 @@ namespace LuaBinding {
             *u = t; *(u + 1) = (void*)0xC0FFEE;
             helper<std::remove_pointer_t<std::decay_t<T>>>::push_metatable(L);
             lua_setmetatable(L, -2);
-            lua_remove(L, -2);
             return t;
         }
 
