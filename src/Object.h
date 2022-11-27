@@ -677,7 +677,7 @@ namespace LuaBinding {
         }
     };
 
-    class IndexProxy : ObjectRef {
+    class IndexProxy : public ObjectRef {
     protected:
         ObjectRef& element;
         const char* str_index;
