@@ -3,9 +3,6 @@
 #include "Function.h"
 
 namespace LuaBinding {
-    class Environment;
-    class ObjectRef;
-    class IndexProxy;
     template<typename T>
     class TableIter
     {

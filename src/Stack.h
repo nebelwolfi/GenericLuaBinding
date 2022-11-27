@@ -6,11 +6,6 @@
 #include <unordered_map>
 
 namespace LuaBinding {
-    template<typename T>
-    class Stack;
-    template<typename T>
-    class StackClass;
-
     namespace detail {
         template<typename T>
         concept is_pushable = requires(T a) {

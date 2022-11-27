@@ -271,6 +271,7 @@ namespace LuaBinding {
     }
 }
 
+#include "ClassPreDefs.h"
 #include "Object.h"
 #include "Environment.h"
 #include "State.h"

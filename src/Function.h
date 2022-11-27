@@ -5,10 +5,6 @@
 #include <tuple>
 
 namespace LuaBinding {
-    class Object;
-    class ObjectRef;
-    class Environment;
-
     namespace FunctionDetail
     {
         template <typename F>
@@ -29,8 +25,6 @@ namespace LuaBinding {
 
     template <typename F>
     using function_type_t = typename FunctionDetail::function_traits<F>::function_type;
-
-    class State;
 
     namespace Function {
         template <class T, class R, class... Params>

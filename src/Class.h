@@ -23,9 +23,6 @@ namespace LuaBinding {
         }
     };
 
-    template<typename C, typename ...Functions>
-    class OverloadedFunction;
-
     template<typename T>
     class Class {
         lua_State* L = nullptr;

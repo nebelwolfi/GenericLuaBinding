@@ -13,14 +13,6 @@ template <typename T>
 struct identity { typedef T type; };
 
 namespace LuaBinding {
-    class State;
-    template<typename T>
-    class Class;
-    class DynClass;
-    class Object;
-    template<typename C, typename ...Functions>
-    class OverloadedFunction;
-
     template< class T >
     inline constexpr bool is_state_v = std::is_same<T, State*>::value;
 
