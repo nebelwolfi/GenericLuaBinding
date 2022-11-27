@@ -1260,6 +1260,30 @@ namespace LuaBinding {
             new (lua_newuserdata(L, sizeof(func))) FnType(func);
             lua_pushcclosure(L, TraitsCFunc<T>::f, 1);
         }
+        
+        template <class T, class F>
+        void fun(lua_State *L, F& func)
+        {
+            fun<T>(L, static_cast<function_type_t<std::decay_t<F>>>(func));
+        }
+
+        template <class T, class F>
+        void cfun(lua_State *L, F& func)
+        {
+            cfun<T>(L, static_cast<function_type_t<std::decay_t<F>>>(func));
+        }
+        
+        template <class T, class F>
+        void fun(lua_State *L, F&& func)
+        {
+            fun<T>(L, static_cast<function_type_t<std::decay_t<F>>>(func));
+        }
+
+        template <class T, class F>
+        void cfun(lua_State *L, F&& func)
+        {
+            cfun<T>(L, static_cast<function_type_t<std::decay_t<F>>>(func));
+        }
     }
 
     template<typename T>
@@ -1496,29 +1520,38 @@ namespace LuaBinding {
             &F::operator();
         };
 
+        template<typename F>
+        concept is_cfun_style = std::is_invocable_v<F, State> || std::is_invocable_v<F, lua_State*>;
+        
         template <typename T>
-        concept is_pushable_fun = (std::is_function_v<std::remove_pointer_t<T>> || has_call_operator<T>) && requires (T t) {
-            { Function::fun<void>(nullptr, t) };
+        concept is_pushable_ref_fun = requires (T &t) {
+            { Function::fun(nullptr, t) };
         };
 
         template <typename T>
-        concept is_pushable_cfun = (std::is_function_v<std::remove_pointer_t<T>> || has_call_operator<T>) && requires (T t) {
-            { Function::cfun<void>(nullptr, t) };
+        concept is_pushable_forward_fun = requires (T &&t) {
+            { Function::fun(nullptr, t) };
         };
-    }
 
-    namespace Function {
-        template <class T, class F>
-        void fun(lua_State *L, F&& func)
-        {
-            fun<T>(L, static_cast<function_type_t<std::decay_t<F>>>(func));
-        }
+        template <typename T>
+        concept is_pushable_ref_cfun = requires (T &t) {
+            { Function::cfun(nullptr, t) };
+        };
 
-        template <class T, class F>
-        void cfun(lua_State *L, F&& func)
-        {
-            cfun(L, static_cast<function_type_t<std::decay_t<F>>>(func));
-        }
+        template <typename T>
+        concept is_pushable_forward_cfun = requires (T &&t) {
+            { Function::cfun(nullptr, t) };
+        };
+
+        template <typename T>
+        concept is_pushable_fun =
+            (std::is_function_v<std::decay_t<std::remove_pointer_t<T>>>) && (is_pushable_ref_fun<std::decay_t<T>> || is_pushable_forward_fun<std::decay_t<T>>)
+            || has_call_operator<std::decay_t<T>>;
+
+        template <typename T>
+        concept is_pushable_cfun =
+            (std::is_function_v<std::decay_t<std::remove_pointer_t<T>>>) && (is_pushable_ref_cfun<std::decay_t<T>> || is_pushable_forward_cfun<std::decay_t<T>>)
+             || (has_call_operator<std::decay_t<T>> && is_cfun_style<std::decay_t<T>>);
     }
 }
 
@@ -2260,6 +2293,27 @@ namespace LuaBinding {
 
         template <typename T>
         IndexProxy& operator=(const T& rhs) {
+            if constexpr (detail::is_pushable_cfun<T>) {
+                if (int_index == -1)
+                    element.cfun(str_index, rhs);
+                else
+                    element.cfun(int_index, rhs);
+            } else if constexpr (detail::is_pushable_fun<T>) {
+                if (int_index == -1)
+                    element.fun(str_index, rhs);
+                else
+                    element.fun(int_index, rhs);
+            } else {
+                if (int_index == -1)
+                    element.set(str_index, rhs);
+                else
+                    element.set(int_index, rhs);
+            }
+            return *this;
+        }
+
+        template <typename T>
+        IndexProxy& operator=(const T&& rhs) {
             if constexpr (detail::is_pushable_cfun<T>) {
                 if (int_index == -1)
                     element.cfun(str_index, rhs);
@@ -3753,8 +3807,6 @@ namespace LuaBinding {
 
 #include <vector>
 #include <stdexcept>
-template <typename T>
-struct identity { typedef T type; };
 
 namespace LuaBinding {
     template< class T >
@@ -4296,7 +4348,7 @@ namespace LuaBinding {
 
         IndexProxy operator[](const char* idx)
         {
-            auto ref = this->at("_G");
+            static auto ref = this->at("_G");
             return IndexProxy(ref, idx);
         }
 

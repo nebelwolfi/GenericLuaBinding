@@ -758,6 +758,27 @@ namespace LuaBinding {
             }
             return *this;
         }
+
+        template <typename T>
+        IndexProxy& operator=(const T&& rhs) {
+            if constexpr (detail::is_pushable_cfun<T>) {
+                if (int_index == -1)
+                    element.cfun(str_index, rhs);
+                else
+                    element.cfun(int_index, rhs);
+            } else if constexpr (detail::is_pushable_fun<T>) {
+                if (int_index == -1)
+                    element.fun(str_index, rhs);
+                else
+                    element.fun(int_index, rhs);
+            } else {
+                if (int_index == -1)
+                    element.set(str_index, rhs);
+                else
+                    element.set(int_index, rhs);
+            }
+            return *this;
+        }
     };
 
     template<>

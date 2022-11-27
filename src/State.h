@@ -10,8 +10,6 @@
 #include "Function.h"
 #include <vector>
 #include <stdexcept>
-template <typename T>
-struct identity { typedef T type; };
 
 namespace LuaBinding {
     template< class T >
@@ -553,7 +551,7 @@ namespace LuaBinding {
 
         IndexProxy operator[](const char* idx)
         {
-            auto ref = this->at("_G");
+            static auto ref = this->at("_G");
             return IndexProxy(ref, idx);
         }
 
