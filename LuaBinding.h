@@ -3039,11 +3039,13 @@ namespace LuaBinding {
             lua_pushcclosure(L, tostring, 1);
             lua_setfield(L, -2, "__tostring");
 
+#ifdef LUABINDING_DYN_CLASSES
             lua_pushcfunction(L, dyn_read);
             lua_setfield(L, -2, "Read");
 
             lua_pushcfunction(L, dyn_cast);
             lua_setfield(L, -2, "Cast");
+#endif
 
             lua_pop(L, 1);
 
@@ -3051,8 +3053,10 @@ namespace LuaBinding {
             lua_pushcfunction(L, get_ptr);
             lua_setfield(L, -2, "ptr");
 
+#ifdef LUABINDING_DYN_CLASSES
             lua_pushcfunction(L, get_vtable);
             lua_setfield(L, -2, "vTable");
+#endif
 
             lua_pop(L, 1);
 
