@@ -400,32 +400,30 @@ namespace LuaBinding {
         
         template <typename T>
         concept is_pushable_ref_fun = requires (T &t) {
-            { Function::fun(nullptr, t) };
+            { Function::fun<void>(nullptr, t) };
         };
 
         template <typename T>
         concept is_pushable_forward_fun = requires (T &&t) {
-            { Function::fun(nullptr, t) };
+            { Function::fun<void>(nullptr, t) };
         };
 
         template <typename T>
         concept is_pushable_ref_cfun = requires (T &t) {
-            { Function::cfun(nullptr, t) };
+            { Function::cfun<void>(nullptr, t) };
         };
 
         template <typename T>
         concept is_pushable_forward_cfun = requires (T &&t) {
-            { Function::cfun(nullptr, t) };
+            { Function::cfun<void>(nullptr, t) };
         };
 
         template <typename T>
         concept is_pushable_fun =
-            (std::is_function_v<std::decay_t<std::remove_pointer_t<T>>>) && (is_pushable_ref_fun<std::decay_t<T>> || is_pushable_forward_fun<std::decay_t<T>>)
-            || has_call_operator<std::decay_t<T>>;
+            is_pushable_ref_fun<std::decay_t<T>> || is_pushable_forward_fun<std::decay_t<T>>;
 
         template <typename T>
         concept is_pushable_cfun =
-            (std::is_function_v<std::decay_t<std::remove_pointer_t<T>>>) && (is_pushable_ref_cfun<std::decay_t<T>> || is_pushable_forward_cfun<std::decay_t<T>>)
-             || (has_call_operator<std::decay_t<T>> && is_cfun_style<std::decay_t<T>>);
+            (is_pushable_ref_cfun<std::decay_t<T>> || is_pushable_forward_cfun<std::decay_t<T>>) && is_cfun_style<std::decay_t<T>>;
     }
 }

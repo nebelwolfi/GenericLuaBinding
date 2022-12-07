@@ -131,7 +131,7 @@ namespace LuaBinding {
         static int lua_CIndexFunction(lua_State* S)
         {
             if (strcmp(lua_tostring(S, 2), "ptr") != 0
-                && strcmp(lua_tostring(S, 2), "isValid") != 0
+                && strcmp(lua_tostring(S, 2), "valid") != 0
                 && luaL_getmetafield(S, 1, "__valid"))
             {
                 lua_pushvalue(S, 1);

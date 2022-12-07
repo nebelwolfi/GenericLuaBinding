@@ -273,7 +273,7 @@ namespace LuaBinding {
         }
         static unsigned int get(lua_State* L, int index)
         {
-            return (uint32_t)lua_tonumber(L, index);
+            return lua_touinteger(L, index);
         }
         static const char* type_name(lua_State* L) {
             return "unsigned integer";
@@ -488,6 +488,50 @@ namespace LuaBinding {
         }
         static int basic_type(lua_State* L) {
             return LUA_TSTRING;
+        }
+    };
+
+    template<>
+    class Stack<source_location> {
+    public:
+        static int push(lua_State* L, source_location t)
+        {
+            lua_newtable(L);
+            lua_pushstring(L, t.file_name());
+            lua_setfield(L, -2, "file_name");
+            lua_pushnumber(L, t.line());
+            lua_setfield(L, -2, "line");
+            return 1;
+        }
+        static bool is(lua_State* L, int index) {
+            return lua_isstring(L, index);
+        }
+        static source_location get(lua_State* L, int index)
+        {
+            lua_getglobal(L, "debug");
+            lua_getfield(L, -1, "getinfo");
+            lua_pushvalue(L, index);
+            lua_pushstring(L, "Snl");
+            lua_call(L, 2, 1);
+            lua_getfield(L, -1, "source");
+            lua_getfield(L, -2, "currentline");
+            lua_getfield(L, -3, "name");
+            lua_getfield(L, -4, "what");
+            std::string source = luaL_tolstring(L, -4, nullptr);
+            int line = lua_tointeger(L, -3);
+            std::string name = luaL_tolstring(L, -2, nullptr);
+            std::string what = luaL_tolstring(L, -1, nullptr);
+            lua_pop(L, 6);
+            return { (uint_least32_t)line, (const char*)source.c_str(), (const char*)(what + ": " + name).c_str() };
+        }
+        static const char* type_name(lua_State* L) {
+            return "source_location";
+        }
+        static const char* basic_type_name(lua_State* L) {
+            return "source_location";
+        }
+        static int basic_type(lua_State* L) {
+            return LUA_TTABLE;
         }
     };
 

@@ -476,12 +476,12 @@ namespace LuaBinding {
         static int set(lua_State* L) {
             auto t = StackClass<T*>::get(L, 1);
             auto fnptr = reinterpret_cast <set_t*> (lua_touserdata(L, lua_upvalueindex(1)));
-            return fnptr(t, State(L));
+            return (t->**fnptr)(State(L));
         }
         static int get(lua_State* L) {
             auto t = StackClass<T*>::get(L, 1);
             auto fnptr = reinterpret_cast <get_t*> (lua_touserdata(L, lua_upvalueindex(1)));
-            return fnptr(t, State(L));
+            return (t->**fnptr)(State(L));
         }
     };
 }

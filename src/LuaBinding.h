@@ -96,10 +96,14 @@
         lua_getglobal(L, name);
         return lua_type(L, -1);
     }
+    inline unsigned int lua_touinteger(lua_State* L, int idx)
+    {
+        return (unsigned int)lua_tonumber(L, idx);
+    }
 #else
     inline int lua_getlen(lua_State* L, int idx)
     {
-        return lua_rawlen(L, idx);
+        return (int)lua_rawlen(L, idx);
     }
     inline int luaL_gettable(lua_State *L, int idx) {
         return lua_gettable(L, idx);
@@ -118,6 +122,49 @@
 #endif
 
 namespace LuaBinding {
+    struct source_location {
+        _NODISCARD static consteval source_location current(const uint_least32_t _Line_ = __builtin_LINE(),
+            const uint_least32_t _Column_ = __builtin_COLUMN(), const char* const _File_ = __builtin_FILE(),
+            const char* const _Function_ = __builtin_FUNCTION()) noexcept {
+            source_location _Result;
+            _Result._Line     = _Line_;
+            _Result._Column   = _Column_;
+            _Result._File     = _File_;
+            _Result._Function = _Function_;
+            return _Result;
+        }
+        
+        _NODISCARD source_location(const uint_least32_t _Line_,
+                                   const char* const _File_,
+                                   const char* const _Function_) noexcept {
+            this->_Line     = _Line_;
+            this->_Column   = 0;
+            this->_File     = _File_;
+            this->_Function = _Function_;
+        }
+
+        _NODISCARD_CTOR constexpr source_location() noexcept = default;
+
+        _NODISCARD constexpr uint_least32_t line() const noexcept {
+            return _Line;
+        }
+        _NODISCARD constexpr uint_least32_t column() const noexcept {
+            return _Column;
+        }
+        _NODISCARD constexpr const char* file_name() const noexcept {
+            return _File;
+        }
+        _NODISCARD constexpr const char* function_name() const noexcept {
+            return _Function;
+        }
+
+    private:
+        uint_least32_t _Line{};
+        uint_least32_t _Column{};
+        const char* _File     = "";
+        const char* _Function = "";
+    };
+
     namespace ResolveDetail {
         namespace _resolve {
             template <typename Sig, typename C>

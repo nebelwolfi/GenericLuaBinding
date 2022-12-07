@@ -97,10 +97,14 @@
         lua_getglobal(L, name);
         return lua_type(L, -1);
     }
+    inline unsigned int lua_touinteger(lua_State* L, int idx)
+    {
+        return (unsigned int)lua_tonumber(L, idx);
+    }
 #else
     inline int lua_getlen(lua_State* L, int idx)
     {
-        return lua_rawlen(L, idx);
+        return (int)lua_rawlen(L, idx);
     }
     inline int luaL_gettable(lua_State *L, int idx) {
         return lua_gettable(L, idx);
@@ -119,6 +123,49 @@
 #endif
 
 namespace LuaBinding {
+    struct source_location {
+        _NODISCARD static consteval source_location current(const uint_least32_t _Line_ = __builtin_LINE(),
+            const uint_least32_t _Column_ = __builtin_COLUMN(), const char* const _File_ = __builtin_FILE(),
+            const char* const _Function_ = __builtin_FUNCTION()) noexcept {
+            source_location _Result;
+            _Result._Line     = _Line_;
+            _Result._Column   = _Column_;
+            _Result._File     = _File_;
+            _Result._Function = _Function_;
+            return _Result;
+        }
+        
+        _NODISCARD source_location(const uint_least32_t _Line_,
+                                   const char* const _File_,
+                                   const char* const _Function_) noexcept {
+            this->_Line     = _Line_;
+            this->_Column   = 0;
+            this->_File     = _File_;
+            this->_Function = _Function_;
+        }
+
+        _NODISCARD_CTOR constexpr source_location() noexcept = default;
+
+        _NODISCARD constexpr uint_least32_t line() const noexcept {
+            return _Line;
+        }
+        _NODISCARD constexpr uint_least32_t column() const noexcept {
+            return _Column;
+        }
+        _NODISCARD constexpr const char* file_name() const noexcept {
+            return _File;
+        }
+        _NODISCARD constexpr const char* function_name() const noexcept {
+            return _Function;
+        }
+
+    private:
+        uint_least32_t _Line{};
+        uint_least32_t _Column{};
+        const char* _File     = "";
+        const char* _Function = "";
+    };
+
     namespace ResolveDetail {
         namespace _resolve {
             template <typename Sig, typename C>
@@ -566,7 +613,7 @@ namespace LuaBinding {
         }
         static unsigned int get(lua_State* L, int index)
         {
-            return (uint32_t)lua_tonumber(L, index);
+            return lua_touinteger(L, index);
         }
         static const char* type_name(lua_State* L) {
             return "unsigned integer";
@@ -781,6 +828,50 @@ namespace LuaBinding {
         }
         static int basic_type(lua_State* L) {
             return LUA_TSTRING;
+        }
+    };
+
+    template<>
+    class Stack<source_location> {
+    public:
+        static int push(lua_State* L, source_location t)
+        {
+            lua_newtable(L);
+            lua_pushstring(L, t.file_name());
+            lua_setfield(L, -2, "file_name");
+            lua_pushnumber(L, t.line());
+            lua_setfield(L, -2, "line");
+            return 1;
+        }
+        static bool is(lua_State* L, int index) {
+            return lua_isstring(L, index);
+        }
+        static source_location get(lua_State* L, int index)
+        {
+            lua_getglobal(L, "debug");
+            lua_getfield(L, -1, "getinfo");
+            lua_pushvalue(L, index);
+            lua_pushstring(L, "Snl");
+            lua_call(L, 2, 1);
+            lua_getfield(L, -1, "source");
+            lua_getfield(L, -2, "currentline");
+            lua_getfield(L, -3, "name");
+            lua_getfield(L, -4, "what");
+            std::string source = luaL_tolstring(L, -4, nullptr);
+            int line = lua_tointeger(L, -3);
+            std::string name = luaL_tolstring(L, -2, nullptr);
+            std::string what = luaL_tolstring(L, -1, nullptr);
+            lua_pop(L, 6);
+            return { (uint_least32_t)line, (const char*)source.c_str(), (const char*)(what + ": " + name).c_str() };
+        }
+        static const char* type_name(lua_State* L) {
+            return "source_location";
+        }
+        static const char* basic_type_name(lua_State* L) {
+            return "source_location";
+        }
+        static int basic_type(lua_State* L) {
+            return LUA_TTABLE;
         }
     };
 
@@ -1536,33 +1627,31 @@ namespace LuaBinding {
         
         template <typename T>
         concept is_pushable_ref_fun = requires (T &t) {
-            { Function::fun(nullptr, t) };
+            { Function::fun<void>(nullptr, t) };
         };
 
         template <typename T>
         concept is_pushable_forward_fun = requires (T &&t) {
-            { Function::fun(nullptr, t) };
+            { Function::fun<void>(nullptr, t) };
         };
 
         template <typename T>
         concept is_pushable_ref_cfun = requires (T &t) {
-            { Function::cfun(nullptr, t) };
+            { Function::cfun<void>(nullptr, t) };
         };
 
         template <typename T>
         concept is_pushable_forward_cfun = requires (T &&t) {
-            { Function::cfun(nullptr, t) };
+            { Function::cfun<void>(nullptr, t) };
         };
 
         template <typename T>
         concept is_pushable_fun =
-            (std::is_function_v<std::decay_t<std::remove_pointer_t<T>>>) && (is_pushable_ref_fun<std::decay_t<T>> || is_pushable_forward_fun<std::decay_t<T>>)
-            || has_call_operator<std::decay_t<T>>;
+            is_pushable_ref_fun<std::decay_t<T>> || is_pushable_forward_fun<std::decay_t<T>>;
 
         template <typename T>
         concept is_pushable_cfun =
-            (std::is_function_v<std::decay_t<std::remove_pointer_t<T>>>) && (is_pushable_ref_cfun<std::decay_t<T>> || is_pushable_forward_cfun<std::decay_t<T>>)
-             || (has_call_operator<std::decay_t<T>> && is_cfun_style<std::decay_t<T>>);
+            (is_pushable_ref_cfun<std::decay_t<T>> || is_pushable_forward_cfun<std::decay_t<T>>) && is_cfun_style<std::decay_t<T>>;
     }
 }
 
@@ -1574,7 +1663,7 @@ namespace LuaBinding {
         typedef std::forward_iterator_tag iterator_category;
         TableIter(lua_State* L, int index, int base) : L(L), index(index), base(base) { }
         TableIter operator++() { index++; return *this; }
-        T operator*() { lua_rawgeti(L, base, index); return T(L, -1, false); }
+        std::pair<int, T> operator*() { lua_rawgeti(L, base, index); return { index, T(L, -1, false) }; }
         bool operator!=(const TableIter& rhs) { return index != rhs.index; }
     private:
         lua_State* L;
@@ -1974,13 +2063,25 @@ namespace LuaBinding {
         template <typename T>
         bool valid(T *S) requires has_lua_state<T>
         {
-            return L && L == S->lua_state() && this->idx != LUA_REFNIL;
+            return L && S && L == S->lua_state() && this->idx != LUA_REFNIL;
         }
 
         template <typename T>
         bool valid(T *S) const requires has_lua_state<T>
         {
-            return L && L == S->lua_state() && this->idx != LUA_REFNIL;
+            return L && S && L == S->lua_state() && this->idx != LUA_REFNIL;
+        }
+
+        template <typename T>
+        bool valid(std::shared_ptr<T> S) requires has_lua_state<T>
+        {
+            return L && S && L == S->lua_state() && this->idx != LUA_REFNIL;
+        }
+
+        template <typename T>
+        bool valid(std::shared_ptr<T> S) const requires has_lua_state<T>
+        {
+            return L && S && L == S->lua_state() && this->idx != LUA_REFNIL;
         }
 
         bool valid(int ltype)
@@ -3119,7 +3220,7 @@ namespace LuaBinding {
         static int lua_CIndexFunction(lua_State* S)
         {
             if (strcmp(lua_tostring(S, 2), "ptr") != 0
-                && strcmp(lua_tostring(S, 2), "isValid") != 0
+                && strcmp(lua_tostring(S, 2), "valid") != 0
                 && luaL_getmetafield(S, 1, "__valid"))
             {
                 lua_pushvalue(S, 1);
@@ -3811,7 +3912,7 @@ namespace LuaBinding {
         typedef std::forward_iterator_tag iterator_category;
         StackIter(lua_State* L, int index) : L(L), index(index) { }
         StackIter operator++() { index++; return *this; }
-        Object operator*() { return Object(L, index); }
+        std::pair<int, Object> operator*() { return { index, Object(L, index) }; }
         bool operator!=(const StackIter& rhs) { return index != rhs.index; }
     private:
         lua_State* L;
@@ -3840,6 +3941,11 @@ namespace LuaBinding {
             return p;
         }
 #endif
+
+        ObjectRef& globals() {
+            static ObjectRef globals = at("_G");
+            return globals;
+        }
 
     public:
         State() = default;
@@ -3891,7 +3997,11 @@ namespace LuaBinding {
         }
 
         ~State() {
-            if (!view) {
+            if (view) {
+                if (globals().valid(this))
+                    globals().pop();
+            } else {
+                globals().invalidate();
 #ifdef LUABINDING_DYN_CLASSES
                 for (auto& c : *get_dynamic_classes())
                     delete c;
@@ -4363,8 +4473,7 @@ namespace LuaBinding {
 
         IndexProxy operator[](const char* idx)
         {
-            static ObjectRef globals = at("_G");
-            return IndexProxy(globals, idx);
+            return IndexProxy(globals(), idx);
         }
 
         template <class T>
@@ -4892,12 +5001,12 @@ namespace LuaBinding {
         static int set(lua_State* L) {
             auto t = StackClass<T*>::get(L, 1);
             auto fnptr = reinterpret_cast <set_t*> (lua_touserdata(L, lua_upvalueindex(1)));
-            return fnptr(t, State(L));
+            return (t->**fnptr)(State(L));
         }
         static int get(lua_State* L) {
             auto t = StackClass<T*>::get(L, 1);
             auto fnptr = reinterpret_cast <get_t*> (lua_touserdata(L, lua_upvalueindex(1)));
-            return fnptr(t, State(L));
+            return (t->**fnptr)(State(L));
         }
     };
 }

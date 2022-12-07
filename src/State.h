@@ -29,6 +29,11 @@ namespace LuaBinding {
         }
 #endif
 
+        ObjectRef& globals() {
+            static ObjectRef globals = at("_G");
+            return globals;
+        }
+
     public:
         State() = default;
         State(bool) {
@@ -79,7 +84,11 @@ namespace LuaBinding {
         }
 
         ~State() {
-            if (!view) {
+            if (view) {
+                if (globals().valid(this))
+                    globals().pop();
+            } else {
+                globals().invalidate();
 #ifdef LUABINDING_DYN_CLASSES
                 for (auto& c : *get_dynamic_classes())
                     delete c;
@@ -551,8 +560,7 @@ namespace LuaBinding {
 
         IndexProxy operator[](const char* idx)
         {
-            static ObjectRef globals = at("_G");
-            return IndexProxy(globals, idx);
+            return IndexProxy(globals(), idx);
         }
 
         template <class T>

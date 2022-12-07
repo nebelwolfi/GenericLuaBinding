@@ -10,7 +10,7 @@ namespace LuaBinding {
         typedef std::forward_iterator_tag iterator_category;
         TableIter(lua_State* L, int index, int base) : L(L), index(index), base(base) { }
         TableIter operator++() { index++; return *this; }
-        T operator*() { lua_rawgeti(L, base, index); return T(L, -1, false); }
+        std::pair<int, T> operator*() { lua_rawgeti(L, base, index); return { index, T(L, -1, false) }; }
         bool operator!=(const TableIter& rhs) { return index != rhs.index; }
     private:
         lua_State* L;
@@ -410,13 +410,25 @@ namespace LuaBinding {
         template <typename T>
         bool valid(T *S) requires has_lua_state<T>
         {
-            return L && L == S->lua_state() && this->idx != LUA_REFNIL;
+            return L && S && L == S->lua_state() && this->idx != LUA_REFNIL;
         }
 
         template <typename T>
         bool valid(T *S) const requires has_lua_state<T>
         {
-            return L && L == S->lua_state() && this->idx != LUA_REFNIL;
+            return L && S && L == S->lua_state() && this->idx != LUA_REFNIL;
+        }
+
+        template <typename T>
+        bool valid(std::shared_ptr<T> S) requires has_lua_state<T>
+        {
+            return L && S && L == S->lua_state() && this->idx != LUA_REFNIL;
+        }
+
+        template <typename T>
+        bool valid(std::shared_ptr<T> S) const requires has_lua_state<T>
+        {
+            return L && S && L == S->lua_state() && this->idx != LUA_REFNIL;
         }
 
         bool valid(int ltype)
