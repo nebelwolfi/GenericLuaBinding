@@ -8,18 +8,19 @@ namespace LuaBinding {
     class helper {
     public:
         static void const* key() { static char value; return &value; }
-        static void push_metatable(lua_State * L) {
+        static bool push_metatable(lua_State * L) {
             lua_getglobal(L, "__METASTORE");
             if (lua_rawgetp(L, -1, key()))
             {
                 lua_remove(L, -2);
-                return;
+                return false;
             }
             lua_pop(L, 1);
             lua_newtable(L);
             lua_pushvalue(L, -1);
             lua_rawsetp(L, -3, key());
             lua_remove(L, -2);
+            return true;
         }
     };
 
@@ -30,7 +31,7 @@ namespace LuaBinding {
     public:
         Class(lua_State* L, const char* name) : L(L), class_name(name)
         {
-            push_metatable();
+            if (!push_metatable()) return;
 
             lua_pushcclosure(L, lua_CGCFunction, 0);
             lua_setfield(L, -2, "__gc");
@@ -64,18 +65,15 @@ namespace LuaBinding {
             push_property_index();
             lua_pushcfunction(L, get_ptr);
             lua_setfield(L, -2, "ptr");
-
 #ifdef LUABINDING_DYN_CLASSES
             lua_pushcfunction(L, get_vtable);
             lua_setfield(L, -2, "vTable");
-#endif
-
             lua_pop(L, 1);
 
             push_property_newindex();
             lua_pushcfunction(L, set_ptr);
             lua_setfield(L, -2, "ptr");
-
+#endif
             lua_pop(L, 1);
         }
     private:
@@ -215,9 +213,9 @@ namespace LuaBinding {
             return 0;
         }
     private:
-        void push_metatable()
+        bool push_metatable()
         {
-            helper<std::remove_pointer_t<std::decay_t<T>>>::push_metatable(L);
+            return helper<std::remove_pointer_t<std::decay_t<T>>>::push_metatable(L);
         }
         void push_function_index()
         {

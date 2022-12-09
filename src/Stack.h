@@ -3,6 +3,13 @@
 #include <map>
 #include <optional>
 #include <vector>
+#include <set>
+#include <list>
+#include <map>
+#include <queue>
+#include <stack>
+#include <deque>
+#include <unordered_set>
 #include <unordered_map>
 
 namespace LuaBinding {
@@ -708,6 +715,294 @@ namespace LuaBinding {
             index = lua_absindex(L, index);
             size_t len = lua_getlen(L, index);
             std::vector<T> result;
+            result.reserve(len);
+            for (auto i = 1; i <= len; i++)
+            {
+                lua_geti(L, index, i);
+                result.push_back(detail::get<T>(L, -1));
+                lua_pop(L, 1);
+            }
+            return result;
+        }
+        static const char* type_name(lua_State* L) {
+            static char buff[100] = { '\0' };
+            if (buff[0]) return buff;
+            if constexpr (detail::is_pushable<T>)
+            {
+                snprintf(buff, 100, "table{%s}", Stack<T>::type_name(L));
+            } else
+                snprintf(buff, 100, "table{%s}", StackClass<T>::type_name(L));
+            return buff;
+        }
+        static const char* basic_type_name(lua_State* L) {
+            return "table";
+        }
+        static int basic_type(lua_State* L) {
+            return LUA_TTABLE;
+        }
+    };
+
+    template<typename T>
+    class Stack<std::list<T>> {
+    public:
+        static int push(lua_State* L, std::list<T> t)
+        {
+            lua_createtable(L, t.size(), 0);
+            for (auto i = 0; i < t.size(); i++)
+            {
+                detail::push<T>(L, t[i]);
+                lua_rawseti(L, -2, i + 1);
+            }
+            return 1;
+        }
+        static bool is(lua_State* L, int index) {
+            return lua_istable(L, index);
+        }
+        static std::list<T> get(lua_State* L, int index)
+        {
+            index = lua_absindex(L, index);
+            size_t len = lua_getlen(L, index);
+            std::list<T> result;
+            result.reserve(len);
+            for (auto i = 1; i <= len; i++)
+            {
+                lua_geti(L, index, i);
+                result.push_back(detail::get<T>(L, -1));
+                lua_pop(L, 1);
+            }
+            return result;
+        }
+        static const char* type_name(lua_State* L) {
+            static char buff[100] = { '\0' };
+            if (buff[0]) return buff;
+            if constexpr (detail::is_pushable<T>)
+            {
+                snprintf(buff, 100, "table{%s}", Stack<T>::type_name(L));
+            } else
+                snprintf(buff, 100, "table{%s}", StackClass<T>::type_name(L));
+            return buff;
+        }
+        static const char* basic_type_name(lua_State* L) {
+            return "table";
+        }
+        static int basic_type(lua_State* L) {
+            return LUA_TTABLE;
+        }
+    };
+
+    template<typename T>
+    class Stack<std::stack<T>> {
+    public:
+        static int push(lua_State* L, std::stack<T> t)
+        {
+            lua_createtable(L, t.size(), 0);
+            for (auto i = 0; i < t.size(); i++)
+            {
+                detail::push<T>(L, t[i]);
+                lua_rawseti(L, -2, i + 1);
+            }
+            return 1;
+        }
+        static bool is(lua_State* L, int index) {
+            return lua_istable(L, index);
+        }
+        static std::stack<T> get(lua_State* L, int index)
+        {
+            index = lua_absindex(L, index);
+            size_t len = lua_getlen(L, index);
+            std::stack<T> result;
+            result.reserve(len);
+            for (auto i = 1; i <= len; i++)
+            {
+                lua_geti(L, index, i);
+                result.push_back(detail::get<T>(L, -1));
+                lua_pop(L, 1);
+            }
+            return result;
+        }
+        static const char* type_name(lua_State* L) {
+            static char buff[100] = { '\0' };
+            if (buff[0]) return buff;
+            if constexpr (detail::is_pushable<T>)
+            {
+                snprintf(buff, 100, "table{%s}", Stack<T>::type_name(L));
+            } else
+                snprintf(buff, 100, "table{%s}", StackClass<T>::type_name(L));
+            return buff;
+        }
+        static const char* basic_type_name(lua_State* L) {
+            return "table";
+        }
+        static int basic_type(lua_State* L) {
+            return LUA_TTABLE;
+        }
+    };
+
+    template<typename T>
+    class Stack<std::queue<T>> {
+    public:
+        static int push(lua_State* L, std::queue<T> t)
+        {
+            lua_createtable(L, t.size(), 0);
+            for (auto i = 0; i < t.size(); i++)
+            {
+                detail::push<T>(L, t[i]);
+                lua_rawseti(L, -2, i + 1);
+            }
+            return 1;
+        }
+        static bool is(lua_State* L, int index) {
+            return lua_istable(L, index);
+        }
+        static std::queue<T> get(lua_State* L, int index)
+        {
+            index = lua_absindex(L, index);
+            size_t len = lua_getlen(L, index);
+            std::queue<T> result;
+            result.reserve(len);
+            for (auto i = 1; i <= len; i++)
+            {
+                lua_geti(L, index, i);
+                result.push_back(detail::get<T>(L, -1));
+                lua_pop(L, 1);
+            }
+            return result;
+        }
+        static const char* type_name(lua_State* L) {
+            static char buff[100] = { '\0' };
+            if (buff[0]) return buff;
+            if constexpr (detail::is_pushable<T>)
+            {
+                snprintf(buff, 100, "table{%s}", Stack<T>::type_name(L));
+            } else
+                snprintf(buff, 100, "table{%s}", StackClass<T>::type_name(L));
+            return buff;
+        }
+        static const char* basic_type_name(lua_State* L) {
+            return "table";
+        }
+        static int basic_type(lua_State* L) {
+            return LUA_TTABLE;
+        }
+    };
+
+    template<typename T>
+    class Stack<std::deque<T>> {
+    public:
+        static int push(lua_State* L, std::deque<T> t)
+        {
+            lua_createtable(L, t.size(), 0);
+            for (auto i = 0; i < t.size(); i++)
+            {
+                detail::push<T>(L, t[i]);
+                lua_rawseti(L, -2, i + 1);
+            }
+            return 1;
+        }
+        static bool is(lua_State* L, int index) {
+            return lua_istable(L, index);
+        }
+        static std::deque<T> get(lua_State* L, int index)
+        {
+            index = lua_absindex(L, index);
+            size_t len = lua_getlen(L, index);
+            std::deque<T> result;
+            result.reserve(len);
+            for (auto i = 1; i <= len; i++)
+            {
+                lua_geti(L, index, i);
+                result.push_back(detail::get<T>(L, -1));
+                lua_pop(L, 1);
+            }
+            return result;
+        }
+        static const char* type_name(lua_State* L) {
+            static char buff[100] = { '\0' };
+            if (buff[0]) return buff;
+            if constexpr (detail::is_pushable<T>)
+            {
+                snprintf(buff, 100, "table{%s}", Stack<T>::type_name(L));
+            } else
+                snprintf(buff, 100, "table{%s}", StackClass<T>::type_name(L));
+            return buff;
+        }
+        static const char* basic_type_name(lua_State* L) {
+            return "table";
+        }
+        static int basic_type(lua_State* L) {
+            return LUA_TTABLE;
+        }
+    };
+
+    template<typename T>
+    class Stack<std::set<T>> {
+    public:
+        static int push(lua_State* L, std::set<T> t)
+        {
+            lua_createtable(L, t.size(), 0);
+            for (auto i = 0; i < t.size(); i++)
+            {
+                detail::push<T>(L, t[i]);
+                lua_rawseti(L, -2, i + 1);
+            }
+            return 1;
+        }
+        static bool is(lua_State* L, int index) {
+            return lua_istable(L, index);
+        }
+        static std::set<T> get(lua_State* L, int index)
+        {
+            index = lua_absindex(L, index);
+            size_t len = lua_getlen(L, index);
+            std::set<T> result;
+            result.reserve(len);
+            for (auto i = 1; i <= len; i++)
+            {
+                lua_geti(L, index, i);
+                result.push_back(detail::get<T>(L, -1));
+                lua_pop(L, 1);
+            }
+            return result;
+        }
+        static const char* type_name(lua_State* L) {
+            static char buff[100] = { '\0' };
+            if (buff[0]) return buff;
+            if constexpr (detail::is_pushable<T>)
+            {
+                snprintf(buff, 100, "table{%s}", Stack<T>::type_name(L));
+            } else
+                snprintf(buff, 100, "table{%s}", StackClass<T>::type_name(L));
+            return buff;
+        }
+        static const char* basic_type_name(lua_State* L) {
+            return "table";
+        }
+        static int basic_type(lua_State* L) {
+            return LUA_TTABLE;
+        }
+    };
+
+    template<typename T>
+    class Stack<std::unordered_set<T>> {
+    public:
+        static int push(lua_State* L, std::unordered_set<T> t)
+        {
+            lua_createtable(L, t.size(), 0);
+            for (auto i = 0; i < t.size(); i++)
+            {
+                detail::push<T>(L, t[i]);
+                lua_rawseti(L, -2, i + 1);
+            }
+            return 1;
+        }
+        static bool is(lua_State* L, int index) {
+            return lua_istable(L, index);
+        }
+        static std::unordered_set<T> get(lua_State* L, int index)
+        {
+            index = lua_absindex(L, index);
+            size_t len = lua_getlen(L, index);
+            std::unordered_set<T> result;
             result.reserve(len);
             for (auto i = 1; i <= len; i++)
             {
