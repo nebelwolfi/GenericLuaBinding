@@ -7,22 +7,23 @@
 #define LUA_OPEQ 1
 #define LUA_OPLT 2
 #define LUA_OPLE 3
-    inline const char* luaL_tolstring (lua_State* L, int idx, size_t* len) {
-        if (lua_isstring(L, idx))
-            return lua_tolstring(L, idx, len);
-        lua_getglobal(L, "tostring");
-        lua_pushvalue(L, idx);
-        lua_call(L, 1, 1);
-        auto result = lua_tolstring(L, -1, len);
-        lua_pop(L, 1);
-        return result;
-    }
     inline int lua_absindex (lua_State* L, int idx)
     {
         if (idx > LUA_REGISTRYINDEX && idx < 0)
             return lua_gettop (L) + idx + 1;
         else
             return idx;
+    }
+    inline const char* luaL_tolstring (lua_State* L, int idx, size_t* len) {
+        if (lua_isstring(L, idx))
+            return lua_tolstring(L, idx, len);
+        idx = lua_absindex(L, idx);
+        lua_getglobal(L, "tostring");
+        lua_pushvalue(L, idx);
+        lua_call(L, 1, 1);
+        auto result = lua_tolstring(L, -1, len);
+        lua_pop(L, 1);
+        return result;
     }
     inline int lua_rawgetp (lua_State* L, int idx, void const* p)
     {
@@ -122,49 +123,6 @@
 #endif
 
 namespace LuaBinding {
-    struct source_location {
-        _NODISCARD static consteval source_location current(const uint_least32_t _Line_ = __builtin_LINE(),
-            const uint_least32_t _Column_ = __builtin_COLUMN(), const char* const _File_ = __builtin_FILE(),
-            const char* const _Function_ = __builtin_FUNCTION()) noexcept {
-            source_location _Result;
-            _Result._Line     = _Line_;
-            _Result._Column   = _Column_;
-            _Result._File     = _File_;
-            _Result._Function = _Function_;
-            return _Result;
-        }
-        
-        _NODISCARD source_location(const uint_least32_t _Line_,
-                                   const char* const _File_,
-                                   const char* const _Function_) noexcept {
-            this->_Line     = _Line_;
-            this->_Column   = 0;
-            this->_File     = _File_;
-            this->_Function = _Function_;
-        }
-
-        _NODISCARD_CTOR constexpr source_location() noexcept = default;
-
-        _NODISCARD constexpr uint_least32_t line() const noexcept {
-            return _Line;
-        }
-        _NODISCARD constexpr uint_least32_t column() const noexcept {
-            return _Column;
-        }
-        _NODISCARD constexpr const char* file_name() const noexcept {
-            return _File;
-        }
-        _NODISCARD constexpr const char* function_name() const noexcept {
-            return _Function;
-        }
-
-    private:
-        uint_least32_t _Line{};
-        uint_least32_t _Column{};
-        const char* _File     = "";
-        const char* _Function = "";
-    };
-
     namespace ResolveDetail {
         namespace _resolve {
             template <typename Sig, typename C>

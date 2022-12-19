@@ -31,7 +31,11 @@ namespace LuaBinding {
     public:
         Class(lua_State* L, const char* name) : L(L), class_name(name)
         {
-            if (!push_metatable()) return;
+            if (!push_metatable())
+            {
+                lua_pop(L, 1);
+                return;
+            }
 
             lua_pushcclosure(L, lua_CGCFunction, 0);
             lua_setfield(L, -2, "__gc");
