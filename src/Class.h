@@ -750,14 +750,14 @@ namespace LuaBinding {
             {
                 push_property_newindex();
                 new (lua_newuserdata(L, sizeof(set))) set_t(set);
-                lua_pushcclosure(L, TraitsClassPropertyFunCFn<R, T>::set, 1);
+                lua_pushcclosure(L, TraitsClassPropertyFunLCFn<R, T>::set, 1);
                 lua_setfield(L, -2, name);
                 lua_pop(L, 1);
             }
 
             push_property_index();
             new (lua_newuserdata(L, sizeof(get))) get_t(get);
-            lua_pushcclosure(L, TraitsClassPropertyFunCFn<R, T>::get, 1);
+            lua_pushcclosure(L, TraitsClassPropertyFunLCFn<R, T>::get, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
             return *this;
