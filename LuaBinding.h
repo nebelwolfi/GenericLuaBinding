@@ -258,7 +258,7 @@ namespace LuaBinding {
                         printfun("[%d] = %g\n", i, lua_tonumber(L, i));
                     break;
                 case LUA_TUSERDATA:  /* numbers */
-                    printfun("[%d] = %s %X\n", i, lua_typename(L, t), (unsigned int)lua_touserdata(L, i));
+                    printfun("[%d] = %s %llX\n", i, lua_typename(L, t), (uintptr_t)lua_touserdata(L, i));
                     break;
                 default:  /* other values */
                     printfun("[%d] = %s\n", i, lua_typename(L, t));
@@ -1631,9 +1631,9 @@ namespace LuaBinding {
         {
             using FnType = decltype (func);
             new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsCFunc<T>::f, 1);
+            lua_pushcclosure(L, TraitsCFunc::f, 1);
         }
-        
+
         template <class T, class F>
         void fun(lua_State *L, F& func)
         {
@@ -1645,7 +1645,7 @@ namespace LuaBinding {
         {
             cfun<T>(L, static_cast<function_type_t<std::decay_t<F>>>(func));
         }
-        
+
         template <class T, class F>
         void fun(lua_State *L, F&& func)
         {
@@ -1895,7 +1895,7 @@ namespace LuaBinding {
 
         template<typename F>
         concept is_cfun_style = std::is_invocable_v<F, State> || std::is_invocable_v<F, lua_State*>;
-        
+
         template <typename T>
         concept is_pushable_ref_fun = requires (T &t) {
             { Function::fun<void>(nullptr, t) };
@@ -3197,7 +3197,7 @@ namespace LuaBinding {
             if (!lua_isuserdata(S, 1) || !lua_isuserdata(S, 2))
                 lua_pushboolean(S, false);
             else
-                lua_pushboolean(S, *(uint32_t*)lua_touserdata(S, 1) == *(uint32_t*)lua_touserdata(S, 2));
+                lua_pushboolean(S, *(uintptr_t*)lua_touserdata(S, 1) == *(uintptr_t*)lua_touserdata(S, 2));
             return 1;
         }
         static int lua_CIndexFunction(lua_State* S)
@@ -3354,7 +3354,7 @@ namespace LuaBinding {
         }
         static int get_vtable(lua_State *L)
         {
-            lua_pushnumber(L, (double)**(uint32_t**)lua_touserdata(L, 1));
+            lua_pushnumber(L, (double)**(uintptr_t**)lua_touserdata(L, 1));
             return 1;
         }
         static void* topointer(lua_State *L, int idx)
@@ -3363,12 +3363,12 @@ namespace LuaBinding {
         }
         static int get_ptr(lua_State *L)
         {
-            lua_pushnumber(L, (double)*(uint32_t*)lua_touserdata(L, 1));
+            lua_pushnumber(L, (double)*(uintptr_t*)lua_touserdata(L, 1));
             return 1;
         }
         static int set_ptr(lua_State *L)
         {
-            *(uint32_t*)lua_touserdata(L, 1) = (uint32_t)lua_tonumber(L, 3);
+            *(uintptr_t*)lua_touserdata(L, 1) = (uintptr_t)lua_tonumber(L, 3);
             return 0;
         }
         static int get_prop(lua_State *L)
@@ -3376,7 +3376,7 @@ namespace LuaBinding {
             auto offset = lua_tointeger(L, lua_upvalueindex(1));
             auto type = lua_tointeger(L, lua_upvalueindex(2));
 
-            auto p = *(uint32_t*)lua_touserdata(L, 1);
+            auto p = *(uintptr_t*)lua_touserdata(L, 1);
 
             return lua_pushmemtype(L, MemoryType(type), (void*)(p + offset));
         }
@@ -3388,7 +3388,7 @@ namespace LuaBinding {
             DynClass* c = static_cast<DynClass *>(lua_touserdata(L, -1));
             lua_pop(L, 1);
 
-            auto p = *(uint32_t*)lua_touserdata(L, 1);
+            auto p = *(uintptr_t*)lua_touserdata(L, 1);
 
             if (*(void**)(p + offset) == nullptr)
             {
@@ -3412,7 +3412,7 @@ namespace LuaBinding {
             DynClass* c = static_cast<DynClass *>(lua_touserdata(L, -1));
             lua_pop(L, 1);
 
-            auto p = *(uint32_t*)lua_touserdata(L, 1);
+            auto p = *(uintptr_t*)lua_touserdata(L, 1);
             auto u = (void**)lua_newuserdata(L, sizeof(void*) * 2);
             *u = (void*)(p + offset); *(u + 1) = 0;
 
@@ -3426,7 +3426,7 @@ namespace LuaBinding {
             auto offset = lua_tointeger(L, lua_upvalueindex(1));
             auto type = lua_tointeger(L, lua_upvalueindex(2));
 
-            auto p = *(uint32_t*)lua_touserdata(L, 1);
+            auto p = *(uintptr_t*)lua_touserdata(L, 1);
 
             lua_pullmemtype(L, MemoryType(type), (void*)(p + offset));
             return 0;
@@ -3509,7 +3509,7 @@ namespace LuaBinding {
         }
         static int dyn_read(lua_State *L)
         {
-            auto p = (void**)(uint32_t)lua_tonumber(L, 2);
+            auto p = (void**)(uintptr_t)lua_tonumber(L, 2);
             if (p == nullptr || *p == nullptr)
             {
                 lua_pushnil(L);
@@ -3529,7 +3529,7 @@ namespace LuaBinding {
         }
         static int dyn_cast(lua_State *L)
         {
-            auto p = (void*)(uint32_t)lua_tonumber(L, 2);
+            auto p = (void*)(uintptr_t)lua_tonumber(L, 2);
             if (p == 0)
             {
                 lua_pushnil(L);
@@ -3651,17 +3651,17 @@ namespace LuaBinding {
         }
         static int get_vtable(lua_State *L)
         {
-            lua_pushnumber(L, (double)**(uint32_t**)lua_touserdata(L, 1));
+            lua_pushnumber(L, (double)**(uintptr_t**)lua_touserdata(L, 1));
             return 1;
         }
         static int get_ptr(lua_State* L)
         {
-            lua_pushnumber(L, (double)*(uint32_t*)lua_touserdata(L, 1));
+            lua_pushnumber(L, (double)*(uintptr_t*)lua_touserdata(L, 1));
             return 1;
         }
         static int set_ptr(lua_State *L)
         {
-            *(uint32_t*)lua_touserdata(L, 1) = (uint32_t)lua_tonumber(L, 3);
+            *(uintptr_t*)lua_touserdata(L, 1) = (uintptr_t)lua_tonumber(L, 3);
             return 0;
         }
         static int tostring(lua_State* S)
@@ -3682,7 +3682,7 @@ namespace LuaBinding {
         {
             if (!lua_isuserdata(S, 1) || !lua_isuserdata(S, 2)) lua_pushboolean(S, false);
             else
-                lua_pushboolean(S, *(uint32_t*)lua_touserdata(S, 1) == *(uint32_t*)lua_touserdata(S, 2));
+                lua_pushboolean(S, *(uintptr_t*)lua_touserdata(S, 1) == *(uintptr_t*)lua_touserdata(S, 2));
             return 1;
         }
         static int lua_CIndexFunction(lua_State* S)
@@ -4334,7 +4334,7 @@ namespace LuaBinding {
 
         static int dyn_read(lua_State *L)
         {
-            auto p = (void**)(uint32_t)lua_tonumber(L, 2);
+            auto p = (void**)(uintptr_t)lua_tonumber(L, 2);
             if (p == nullptr || *p == nullptr)
             {
                 lua_pushnil(L);
@@ -4351,7 +4351,7 @@ namespace LuaBinding {
         }
         static int dyn_cast(lua_State *L)
         {
-            auto p = (void*)(uint32_t)lua_tonumber(L, 2);
+            auto p = (void*)(uintptr_t)lua_tonumber(L, 2);
             if (p == 0)
             {
                 lua_pushnil(L);

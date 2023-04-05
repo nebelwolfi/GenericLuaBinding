@@ -257,7 +257,7 @@ namespace LuaBinding {
                         printfun("[%d] = %g\n", i, lua_tonumber(L, i));
                     break;
                 case LUA_TUSERDATA:  /* numbers */
-                    printfun("[%d] = %s %X\n", i, lua_typename(L, t), (unsigned int)lua_touserdata(L, i));
+                    printfun("[%d] = %s %llX\n", i, lua_typename(L, t), (uintptr_t)lua_touserdata(L, i));
                     break;
                 default:  /* other values */
                     printfun("[%d] = %s\n", i, lua_typename(L, t));

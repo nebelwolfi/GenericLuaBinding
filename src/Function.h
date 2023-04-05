@@ -133,7 +133,7 @@ namespace LuaBinding {
         {
             using FnType = decltype (func);
             new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsCFunc<T>::f, 1);
+            lua_pushcclosure(L, TraitsCFunc::f, 1);
         }
         
         template <class T, class F>

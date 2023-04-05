@@ -74,9 +74,9 @@ namespace LuaBinding {
         {
             char asdf[128];
             if constexpr (sizeof(ptrdiff_t) == 4)
-                snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, lua_upvalueindex(1)), (uint32_t)topointer(S, 1));
+                snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
             else if constexpr (sizeof(ptrdiff_t) == 8)
-                snprintf(asdf, sizeof(asdf), "%s{%llX}", lua_tostring(S, lua_upvalueindex(1)), (uint64_t)topointer(S, 1));
+                snprintf(asdf, sizeof(asdf), "%s{%llX}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
             lua_pushstring(S, asdf);
             return 1;
         }
@@ -98,7 +98,7 @@ namespace LuaBinding {
             if (!lua_isuserdata(S, 1) || !lua_isuserdata(S, 2))
                 lua_pushboolean(S, false);
             else
-                lua_pushboolean(S, *(uint32_t*)lua_touserdata(S, 1) == *(uint32_t*)lua_touserdata(S, 2));
+                lua_pushboolean(S, *(uintptr_t*)lua_touserdata(S, 1) == *(uintptr_t*)lua_touserdata(S, 2));
             return 1;
         }
         static int lua_CIndexFunction(lua_State* S)
@@ -119,9 +119,9 @@ namespace LuaBinding {
                     if (luaL_getmetafield(S, 1, "__name")) {
                         char asdf[128];
                         if constexpr (sizeof(ptrdiff_t) == 4)
-                            snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, lua_upvalueindex(1)), (uint32_t)topointer(S, 1));
+                            snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
                         else if constexpr (sizeof(ptrdiff_t) == 8)
-                            snprintf(asdf, sizeof(asdf), "%s{%llX}", lua_tostring(S, lua_upvalueindex(1)), (uint64_t)topointer(S, 1));
+                            snprintf(asdf, sizeof(asdf), "%s{%llX}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
                         lua_pop(S, 1);
 
                         luaL_error(S, "Tried to access invalid %s (property '%s')", asdf, lua_tostring(S, 2));
@@ -202,7 +202,7 @@ namespace LuaBinding {
             }
             if (assert)
             {
-                luaL_error(L, "metatable not found in __METASTORE for %X", _this);
+                luaL_error(L, "metatable not found in __METASTORE for %llX", _this);
             }
             lua_pop(L, 1);
             lua_newtable(L);
@@ -255,7 +255,7 @@ namespace LuaBinding {
         }
         static int get_vtable(lua_State *L)
         {
-            lua_pushnumber(L, (double)**(uint32_t**)lua_touserdata(L, 1));
+            lua_pushnumber(L, (double)**(uintptr_t**)lua_touserdata(L, 1));
             return 1;
         }
         static void* topointer(lua_State *L, int idx)
@@ -264,12 +264,12 @@ namespace LuaBinding {
         }
         static int get_ptr(lua_State *L)
         {
-            lua_pushnumber(L, (double)*(uint32_t*)lua_touserdata(L, 1));
+            lua_pushnumber(L, (double)*(uintptr_t*)lua_touserdata(L, 1));
             return 1;
         }
         static int set_ptr(lua_State *L)
         {
-            *(uint32_t*)lua_touserdata(L, 1) = (uint32_t)lua_tonumber(L, 3);
+            *(uintptr_t*)lua_touserdata(L, 1) = (uintptr_t)lua_tonumber(L, 3);
             return 0;
         }
         static int get_prop(lua_State *L)
@@ -277,7 +277,7 @@ namespace LuaBinding {
             auto offset = lua_tointeger(L, lua_upvalueindex(1));
             auto type = lua_tointeger(L, lua_upvalueindex(2));
 
-            auto p = *(uint32_t*)lua_touserdata(L, 1);
+            auto p = *(uintptr_t*)lua_touserdata(L, 1);
 
             return lua_pushmemtype(L, MemoryType(type), (void*)(p + offset));
         }
@@ -289,7 +289,7 @@ namespace LuaBinding {
             DynClass* c = static_cast<DynClass *>(lua_touserdata(L, -1));
             lua_pop(L, 1);
 
-            auto p = *(uint32_t*)lua_touserdata(L, 1);
+            auto p = *(uintptr_t*)lua_touserdata(L, 1);
 
             if (*(void**)(p + offset) == nullptr)
             {
@@ -313,7 +313,7 @@ namespace LuaBinding {
             DynClass* c = static_cast<DynClass *>(lua_touserdata(L, -1));
             lua_pop(L, 1);
 
-            auto p = *(uint32_t*)lua_touserdata(L, 1);
+            auto p = *(uintptr_t*)lua_touserdata(L, 1);
             auto u = (void**)lua_newuserdata(L, sizeof(void*) * 2);
             *u = (void*)(p + offset); *(u + 1) = 0;
 
@@ -327,7 +327,7 @@ namespace LuaBinding {
             auto offset = lua_tointeger(L, lua_upvalueindex(1));
             auto type = lua_tointeger(L, lua_upvalueindex(2));
 
-            auto p = *(uint32_t*)lua_touserdata(L, 1);
+            auto p = *(uintptr_t*)lua_touserdata(L, 1);
 
             lua_pullmemtype(L, MemoryType(type), (void*)(p + offset));
             return 0;
@@ -410,7 +410,7 @@ namespace LuaBinding {
         }
         static int dyn_read(lua_State *L)
         {
-            auto p = (void**)(uint32_t)lua_tonumber(L, 2);
+            auto p = (void**)(uintptr_t)lua_tonumber(L, 2);
             if (p == nullptr || *p == nullptr)
             {
                 lua_pushnil(L);
@@ -430,7 +430,7 @@ namespace LuaBinding {
         }
         static int dyn_cast(lua_State *L)
         {
-            auto p = (void*)(uint32_t)lua_tonumber(L, 2);
+            auto p = (void*)(uintptr_t)lua_tonumber(L, 2);
             if (p == 0)
             {
                 lua_pushnil(L);
