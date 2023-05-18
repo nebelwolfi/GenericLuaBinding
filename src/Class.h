@@ -144,9 +144,9 @@ namespace LuaBinding {
                     if (luaL_getmetafield(S, 1, "__name")) {
                         char asdf[128];
                         if constexpr (sizeof(ptrdiff_t) == 4)
-                            snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
+                            snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, -1), (uintptr_t)topointer(S, 1));
                         else if constexpr (sizeof(ptrdiff_t) == 8)
-                            snprintf(asdf, sizeof(asdf), "%s{%llX}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
+                            snprintf(asdf, sizeof(asdf), "%s{%llX}", lua_tostring(S, -1), (uintptr_t)topointer(S, 1));
                         lua_pop(S, 1);
 
                         luaL_error(S, "Tried to access invalid %s (property '%s')", asdf, lua_tostring(S, 2));

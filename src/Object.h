@@ -166,12 +166,16 @@ namespace LuaBinding {
             if constexpr (std::is_same_v<void, R>) {
                 if (LuaBinding::pcall(L, 0, 0))
                 {
+#ifndef NOEXCEPTIONS
                     throw std::exception(lua_tostring(L, -1));
+#endif
                 }
             } else {
                 if (LuaBinding::pcall(L, 0, 1))
                 {
+#ifndef NOEXCEPTIONS
                     throw std::exception(lua_tostring(L, -1));
+#endif
                 }
                 auto result = LuaBinding::detail::get<R>(L, -1);
                 lua_pop(L, 1);
@@ -184,7 +188,9 @@ namespace LuaBinding {
             push();
             if (LuaBinding::pcall(L, 0, R))
             {
-                throw std::exception(lua_tostring(L, -1));
+#ifndef NOEXCEPTIONS
+                    throw std::exception(lua_tostring(L, -1));
+#endif
             }
         }
 
@@ -196,12 +202,16 @@ namespace LuaBinding {
             if constexpr (std::is_same_v<void, R>) {
                 if (LuaBinding::pcall(L, sizeof...(param), 0))
                 {
+#ifndef NOEXCEPTIONS
                     throw std::exception(lua_tostring(L, -1));
+#endif
                 }
             } else {
                 if (LuaBinding::pcall(L, sizeof...(param), 1))
                 {
+#ifndef NOEXCEPTIONS
                     throw std::exception(lua_tostring(L, -1));
+#endif
                 }
                 auto result = LuaBinding::detail::get<R>(L, -1);
                 lua_pop(L, 1);
@@ -216,7 +226,9 @@ namespace LuaBinding {
                 (void)std::initializer_list<int>{ detail::push(L, param)... };
             if (LuaBinding::pcall(L, sizeof...(param), R))
             {
-                throw std::exception(lua_tostring(L, -1));
+#ifndef NOEXCEPTIONS
+                    throw std::exception(lua_tostring(L, -1));
+#endif
             }
         }
 
@@ -228,12 +240,16 @@ namespace LuaBinding {
             if constexpr (std::is_same_v<void, R>) {
                 if (env.pcall(sizeof...(param), 0))
                 {
+#ifndef NOEXCEPTIONS
                     throw std::exception(lua_tostring(L, -1));
+#endif
                 }
             } else {
                 if (env.pcall(sizeof...(param), 1))
                 {
+#ifndef NOEXCEPTIONS
                     throw std::exception(lua_tostring(L, -1));
+#endif
                 }
                 auto result = LuaBinding::detail::get<R>(L, -1);
                 lua_pop(L, 1);
@@ -248,7 +264,9 @@ namespace LuaBinding {
                 (void)std::initializer_list<int>{ detail::push(L, param)... };
             if (env.pcall(sizeof...(param), R))
             {
-                throw std::exception(lua_tostring(L, -1));
+#ifndef NOEXCEPTIONS
+                    throw std::exception(lua_tostring(L, -1));
+#endif
             }
         }
 
@@ -257,7 +275,9 @@ namespace LuaBinding {
             push();
             if (LuaBinding::pcall(L, 0, 1))
             {
-                throw std::exception(lua_tostring(L, -1));
+#ifndef NOEXCEPTIONS
+                    throw std::exception(lua_tostring(L, -1));
+#endif
             }
             return Ref(L, -1, false);
         }
@@ -269,7 +289,9 @@ namespace LuaBinding {
                 (void)std::initializer_list<int>{ detail::push(L, param)... };
             if (LuaBinding::pcall(L, sizeof...(param), 1))
             {
-                throw std::exception(lua_tostring(L, -1));
+#ifndef NOEXCEPTIONS
+                    throw std::exception(lua_tostring(L, -1));
+#endif
             }
             return Ref(L, -1, false);
         }
@@ -281,7 +303,9 @@ namespace LuaBinding {
                 (void)std::initializer_list<int>{ detail::push(L, param)... };
             if (env.pcall(sizeof...(param), 1))
             {
-                throw std::exception(lua_tostring(L, -1));
+#ifndef NOEXCEPTIONS
+                    throw std::exception(lua_tostring(L, -1));
+#endif
             }
             return Ref(L, -1, false);
         }

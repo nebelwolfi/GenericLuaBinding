@@ -699,6 +699,54 @@ namespace LuaBinding {
     };
 
     template<typename T>
+    class Stack<std::vector<T>*> {
+    public:
+        static int push(lua_State* L, std::vector<T>* t)
+        {
+            lua_createtable(L, t->size(), 0);
+            for (auto i = 0; i < t->size(); i++)
+            {
+                detail::push<T>(L, t->at(i));
+                lua_rawseti(L, -2, i + 1);
+            }
+            return 1;
+        }
+        static bool is(lua_State* L, int index) {
+            return lua_istable(L, index);
+        }
+        static std::vector<T>* get(lua_State* L, int index)
+        {
+            index = lua_absindex(L, index);
+            size_t len = lua_getlen(L, index);
+            auto result = new std::vector<T>();
+            result->reserve(len);
+            for (auto i = 1; i <= len; i++)
+            {
+                lua_geti(L, index, i);
+                result->push_back(detail::get<T>(L, -1));
+                lua_pop(L, 1);
+            }
+            return result;
+        }
+        static const char* type_name(lua_State* L) {
+            static char buff[100] = { '\0' };
+            if (buff[0]) return buff;
+            if constexpr (detail::is_pushable<T>)
+            {
+                snprintf(buff, 100, "table{%s}", Stack<T>::type_name(L));
+            } else
+                snprintf(buff, 100, "table{%s}", StackClass<T>::type_name(L));
+            return buff;
+        }
+        static const char* basic_type_name(lua_State* L) {
+            return "table";
+        }
+        static int basic_type(lua_State* L) {
+            return LUA_TTABLE;
+        }
+    };
+
+    template<typename T>
     class Stack<std::list<T>> {
     public:
         static int push(lua_State* L, std::list<T> t)

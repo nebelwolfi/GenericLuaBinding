@@ -109,19 +109,17 @@ namespace LuaBinding {
             {
                 auto success = false;
                 lua_pushvalue(S, 1);
-                __try {
-                    lua_call(S, 1, 1);
-                    success = lua_toboolean(S, -1);
-                } __except(1) { }
+                lua_call(S, 1, 1);
+                success = lua_toboolean(S, -1);
                 if (!success)
                 {
                     lua_pushvalue(S, 1);
                     if (luaL_getmetafield(S, 1, "__name")) {
                         char asdf[128];
                         if constexpr (sizeof(ptrdiff_t) == 4)
-                            snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
+                            snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, -1), (uintptr_t)topointer(S, 1));
                         else if constexpr (sizeof(ptrdiff_t) == 8)
-                            snprintf(asdf, sizeof(asdf), "%s{%llX}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
+                            snprintf(asdf, sizeof(asdf), "%s{%llX}", lua_tostring(S, -1), (uintptr_t)topointer(S, 1));
                         lua_pop(S, 1);
 
                         luaL_error(S, "Tried to access invalid %s (property '%s')", asdf, lua_tostring(S, 2));
@@ -202,7 +200,10 @@ namespace LuaBinding {
             }
             if (assert)
             {
-                luaL_error(L, "metatable not found in __METASTORE for %llX", _this);
+                if constexpr (sizeof(ptrdiff_t) == 4)
+                    luaL_error(L, "metatable not found in __METASTORE for %X", _this);
+                else if constexpr (sizeof(ptrdiff_t) == 8)
+                    luaL_error(L, "metatable not found in __METASTORE for %llX", _this);
             }
             lua_pop(L, 1);
             lua_newtable(L);
