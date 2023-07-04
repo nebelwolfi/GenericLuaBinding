@@ -27,6 +27,6 @@ namespace LuaBinding {
     };
     int lua_pushmemtype(lua_State* L, MemoryType type, void* data);
     int lua_pullmemtype(lua_State* L, MemoryType type, void* addr);
-    size_t get_type_size(MemoryType mt);
+    unsigned int get_type_size(MemoryType mt);
 }
 #endif

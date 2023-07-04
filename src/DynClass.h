@@ -73,10 +73,11 @@ namespace LuaBinding {
         static int tostring(lua_State* S)
         {
             char asdf[128];
-            if constexpr (sizeof(ptrdiff_t) == 4)
+#ifdef ENV32
                 snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
-            else if constexpr (sizeof(ptrdiff_t) == 8)
+#elifdef ENV64
                 snprintf(asdf, sizeof(asdf), "%s{%llX}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
+#endif
             lua_pushstring(S, asdf);
             return 1;
         }
@@ -116,10 +117,11 @@ namespace LuaBinding {
                     lua_pushvalue(S, 1);
                     if (luaL_getmetafield(S, 1, "__name")) {
                         char asdf[128];
-                        if constexpr (sizeof(ptrdiff_t) == 4)
+#ifdef ENV32
                             snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, -1), (uintptr_t)topointer(S, 1));
-                        else if constexpr (sizeof(ptrdiff_t) == 8)
+#elifdef ENV64
                             snprintf(asdf, sizeof(asdf), "%s{%llX}", lua_tostring(S, -1), (uintptr_t)topointer(S, 1));
+#endif
                         lua_pop(S, 1);
 
                         luaL_error(S, "Tried to access invalid %s (property '%s')", asdf, lua_tostring(S, 2));
