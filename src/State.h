@@ -535,16 +535,23 @@ namespace LuaBinding {
         {
             if (index > 0)
             {
+#ifndef NOEXCEPTIONS
                 if (index > lua_gettop(L))
                     throw std::out_of_range("invalid stack subscript");
+#endif
                 return { L, index };
             } else if (index < 0) {
                 auto top = lua_gettop(L);
+#ifndef NOEXCEPTIONS
                 if (-index > top)
                     throw std::out_of_range("invalid stack subscript");
+#endif
                 return { L, top + 1 + index };
             }
+#ifndef NOEXCEPTIONS
             throw std::out_of_range("wat");
+#endif
+            return { L, 0 };
         }
 
         ObjectRef at(const char* idx)
@@ -582,16 +589,23 @@ namespace LuaBinding {
         {
             if (index > 0)
             {
+#ifndef NOEXCEPTIONS
                 if (index > lua_gettop(L))
                     throw std::out_of_range("invalid stack subscript");
+#endif
                 return { L, index };
             } else if (index < 0) {
                 auto top = lua_gettop(L);
+#ifndef NOEXCEPTIONS
                 if (-index > top)
                     throw std::out_of_range("invalid stack subscript");
+#endif
                 return { L, top + 1 + index };
             }
+#ifndef NOEXCEPTIONS
             throw std::out_of_range("wat");
+#endif
+            return { L, 0 };
         }
 
         IndexProxy operator[](const char* idx)
