@@ -192,14 +192,20 @@ namespace LuaBinding {
             return 1;
         }
         static bool is(lua_State* L, int index) requires std::is_same_v<T, void*> {
+#ifdef FLUENT_USERDATA_CHECKS
             if (!lua_isuserdata(L, index) && !lua_isnumber(L, index)) return false;
+#else
+            if (!lua_isuserdata(L, index)) return false;
+#endif
             return true;
         }
         static bool is(lua_State* L, int index) requires (!std::is_same_v<T, void*>) {
             if (!lua_isuserdata(L, index)) {
+#ifdef FLUENT_USERDATA_CHECKS
                 if constexpr (std::is_convertible_v<T, uintptr_t>)
                     if (lua_isnumber(L, index))
                         return true;
+#endif
                 return false;
             }
             lua_getmetatable(L, index);
@@ -234,8 +240,10 @@ namespace LuaBinding {
                         return nullptr;
                 luaL_typeerror(L, index, type_name(L));
             }
+#ifdef FLUENT_USERDATA_CHECKS
             if (lua_isnumber(L, index))
                 return (T)(uintptr_t)lua_tonumber(L, index);
+#endif
             return *(T*)lua_touserdata(L, index);
         }
         static T get(lua_State* L, int index) requires (!std::is_convertible_v<T, void*>)
@@ -244,9 +252,11 @@ namespace LuaBinding {
             {
                 luaL_typeerror(L, index, type_name(L));
             }
+#ifdef FLUENT_USERDATA_CHECKS
             if constexpr (std::is_convertible_v<T, uintptr_t>)
                 if (lua_isnumber(L, index))
                     return (T)(uintptr_t)lua_tonumber(L, index);
+#endif
             return **(T**)lua_touserdata(L, index);
         }
     };
