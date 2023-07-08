@@ -3718,7 +3718,6 @@ namespace LuaBinding {
             lua_pushstring(L, name);
             lua_setfield(L, -2, "__name");
 
-            printf("Class %s registered\n", name);
             lua_pushstring(L, name);
             lua_pushcclosure(L, tostring, 1);
             lua_setfield(L, -2, "__tostring");
