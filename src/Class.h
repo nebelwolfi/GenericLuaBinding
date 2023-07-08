@@ -111,7 +111,7 @@ namespace LuaBinding {
         }
         static int tostring(lua_State* S)
         {
-            char asdf[128];
+            char asdf[128] = { 0 };
 #ifdef ENV32
                 snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
 #elifdef ENV64
@@ -143,7 +143,7 @@ namespace LuaBinding {
                 {
                     lua_pushvalue(S, 1);
                     if (luaL_getmetafield(S, 1, "__name")) {
-                        char asdf[128];
+                        char asdf[128] = { 0 };
 #ifdef ENV32
                             snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, -1), (uintptr_t)topointer(S, 1));
 #elifdef ENV64

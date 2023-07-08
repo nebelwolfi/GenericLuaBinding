@@ -1,21 +1,20 @@
 #pragma once
 
-
 // Check windows
 #if _WIN32 || _WIN64
 #if _WIN64
-#define ENV64
+#define ENV64 1
 #else
-#define ENV32
+#define ENV32 1
 #endif
 #endif
 
 // Check GCC
 #if __GNUC__
 #if __x86_64__ || __ppc64__
-#define ENV64
+#define ENV64 1
 #else
-#define ENV32
+#define ENV32 1
 #endif
 #endif
 
@@ -2915,7 +2914,6 @@ namespace LuaBinding {
 
         int push(int i = -1) override
         {
-            printf("pushing index proxy\n");
             element.push();
             if (str_index)
                 lua_getfield(L, -1, str_index);
@@ -3281,7 +3279,7 @@ namespace LuaBinding {
     private:
         static int tostring(lua_State* S)
         {
-            char asdf[128];
+            char asdf[128] = { 0 };
 #ifdef ENV32
                 snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
 #elifdef ENV64
@@ -3325,7 +3323,7 @@ namespace LuaBinding {
                 {
                     lua_pushvalue(S, 1);
                     if (luaL_getmetafield(S, 1, "__name")) {
-                        char asdf[128];
+                        char asdf[128] = { 0 };
 #ifdef ENV32
                             snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, -1), (uintptr_t)topointer(S, 1));
 #elifdef ENV64
@@ -3720,6 +3718,7 @@ namespace LuaBinding {
             lua_pushstring(L, name);
             lua_setfield(L, -2, "__name");
 
+            printf("Class %s registered\n", name);
             lua_pushstring(L, name);
             lua_pushcclosure(L, tostring, 1);
             lua_setfield(L, -2, "__tostring");
@@ -3779,11 +3778,11 @@ namespace LuaBinding {
         }
         static int tostring(lua_State* S)
         {
-            char asdf[128];
+            char asdf[128] = { 0 };
 #ifdef ENV32
-                snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
+            snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
 #elifdef ENV64
-                snprintf(asdf, sizeof(asdf), "%s{%llX}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
+            snprintf(asdf, sizeof(asdf), "%s{%llX}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
 #endif
             lua_pushstring(S, asdf);
             return 1;
@@ -3811,7 +3810,7 @@ namespace LuaBinding {
                 {
                     lua_pushvalue(S, 1);
                     if (luaL_getmetafield(S, 1, "__name")) {
-                        char asdf[128];
+                        char asdf[128] = { 0 };
 #ifdef ENV32
                             snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, -1), (uintptr_t)topointer(S, 1));
 #elifdef ENV64

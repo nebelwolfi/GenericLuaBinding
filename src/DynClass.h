@@ -72,11 +72,11 @@ namespace LuaBinding {
     private:
         static int tostring(lua_State* S)
         {
-            char asdf[128];
+            char asdf[128] = { 0 };
 #ifdef ENV32
-                snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
+            snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
 #elifdef ENV64
-                snprintf(asdf, sizeof(asdf), "%s{%llX}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
+            snprintf(asdf, sizeof(asdf), "%s{%llX}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
 #endif
             lua_pushstring(S, asdf);
             return 1;
@@ -116,11 +116,11 @@ namespace LuaBinding {
                 {
                     lua_pushvalue(S, 1);
                     if (luaL_getmetafield(S, 1, "__name")) {
-                        char asdf[128];
+                        char asdf[128] = { 0 };
 #ifdef ENV32
-                            snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, -1), (uintptr_t)topointer(S, 1));
+                        snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, -1), (uintptr_t)topointer(S, 1));
 #elifdef ENV64
-                            snprintf(asdf, sizeof(asdf), "%s{%llX}", lua_tostring(S, -1), (uintptr_t)topointer(S, 1));
+                        snprintf(asdf, sizeof(asdf), "%s{%llX}", lua_tostring(S, -1), (uintptr_t)topointer(S, 1));
 #endif
                         lua_pop(S, 1);
 
@@ -202,10 +202,11 @@ namespace LuaBinding {
             }
             if (assert)
             {
-                if constexpr (sizeof(ptrdiff_t) == 4)
-                    luaL_error(L, "metatable not found in __METASTORE for %X", _this);
-                else if constexpr (sizeof(ptrdiff_t) == 8)
-                    luaL_error(L, "metatable not found in __METASTORE for %llX", _this);
+#ifdef ENV32
+                luaL_error(L, "metatable not found in __METASTORE for %X", _this);
+#elifdef ENV64
+                luaL_error(L, "metatable not found in __METASTORE for %llX", _this);
+#endif
             }
             lua_pop(L, 1);
             lua_newtable(L);

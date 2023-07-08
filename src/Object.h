@@ -905,7 +905,6 @@ namespace LuaBinding {
 
         int push(int i = -1) override
         {
-            printf("pushing index proxy\n");
             element.push();
             if (str_index)
                 lua_getfield(L, -1, str_index);
