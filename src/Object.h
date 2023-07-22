@@ -980,9 +980,9 @@ namespace LuaBinding {
         static bool is(lua_State*, int ) {
             return true;
         }
-        static Object get(lua_State* L, int index)
+        static Object get(lua_State* L, int index, int& offset)
         {
-            return Object(L, index);
+            return Object(L, index + offset);
         }
         static const char* basic_type_name(lua_State* L) {
             return "object";
@@ -1004,7 +1004,7 @@ namespace LuaBinding {
             static_assert(true, "Use ObjectRef or ObjectRef& instead of ObjectRef*");
             return false;
         }
-        static Object* get(lua_State* L, int index)
+        static Object* get(lua_State* L, int index, int& offset)
         {
             static_assert(true, "Use ObjectRef or ObjectRef& instead of ObjectRef*");
             return nullptr;
@@ -1021,9 +1021,9 @@ namespace LuaBinding {
         static bool is(lua_State*, int ) {
             return true;
         }
-        static ObjectRef get(lua_State* L, int index)
+        static ObjectRef get(lua_State* L, int index, int& offset)
         {
-            return {L, index, true};
+            return {L, index+offset, true};
         }
         static const char* basic_type_name(lua_State* L) {
             return "object";
@@ -1045,7 +1045,7 @@ namespace LuaBinding {
             static_assert(true, "Use ObjectRef or ObjectRef& instead of ObjectRef*");
             return false;
         }
-        static ObjectRef* get(lua_State* L, int index)
+        static ObjectRef* get(lua_State* L, int index, int& offset)
         {
             static_assert(true, "Use ObjectRef or ObjectRef& instead of ObjectRef*");
             return nullptr;
@@ -1062,7 +1062,7 @@ namespace LuaBinding {
         static bool is(lua_State*, int ) {
             return true;
         }
-        static IndexProxy get(lua_State* L, int index)
+        static IndexProxy get(lua_State* L, int index, int& offset)
         {
             static_assert(true, "Cannot get IndexProxy from lua stack");
         }
@@ -1086,7 +1086,7 @@ namespace LuaBinding {
             static_assert(true, "Use IndexProxy or IndexProxy& instead of IndexProxy*");
             return false;
         }
-        static IndexProxy* get(lua_State* L, int index)
+        static IndexProxy* get(lua_State* L, int index, int& offset)
         {
             static_assert(true, "Use IndexProxy or IndexProxy& instead of IndexProxy*");
             return nullptr;

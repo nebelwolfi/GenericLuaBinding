@@ -1,5 +1,6 @@
 #pragma once
 
+
 // Check windows
 #if _WIN32 || _WIN64
 #if _WIN64
@@ -393,19 +394,22 @@ namespace LuaBinding {
         template<class T> requires is_pushable<T>
         T get(lua_State* L, int index)
         {
-            return Stack<T>::get(L, index);
+            int offset = 0;
+            return Stack<T>::get(L, index, offset);
         }
 
         template<class T> requires (!is_pushable<T>)
         T get(lua_State* L, int index)
         {
-            return StackClass<T>::get(L, index);
+            int offset = 0;
+            return StackClass<T>::get(L, index, offset);
         }
 
         template<class T> requires is_pushable<T>
         T extract(lua_State* L, int index)
         {
-            auto r = Stack<T>::get(L, index);
+            int offset = 0;
+            auto r = Stack<T>::get(L, index, offset);
             lua_remove(L, index);
             return r;
         }
@@ -413,7 +417,8 @@ namespace LuaBinding {
         template<class T> requires (!is_pushable<T>)
         T extract(lua_State* L, int index)
         {
-            auto r = StackClass<T>::get(L, index);
+            int offset = 0;
+            auto r = StackClass<T>::get(L, index, offset);
             lua_remove(L, index);
             return r;
         }
@@ -500,7 +505,7 @@ namespace LuaBinding {
             static_assert(sizeof(T) == 0, "Unspecialized use of Stack<T>::push");
         }
         static bool is(lua_State* L, int index) = delete;
-        static T get(lua_State* L, int index) {
+        static T get(lua_State* L, int index, int& offset) {
             static_assert(sizeof(T) == 0, "Unspecialized use of Stack<T>::get");
         }
         static const char* type_name(lua_State* L) {
@@ -602,8 +607,9 @@ namespace LuaBinding {
         static int basic_type(lua_State* L) {
             return LUA_TUSERDATA;
         }
-        static T get(lua_State* L, int index) requires (std::is_convertible_v<T, void*>)
+        static T get(lua_State* L, int index, int& offset) requires (std::is_convertible_v<T, void*>)
         {
+            index += offset;
             if (!is(L, index))
             {
                 if constexpr (std::is_convertible_v<T, void*>)
@@ -617,8 +623,9 @@ namespace LuaBinding {
 #endif
             return *(T*)lua_touserdata(L, index);
         }
-        static T get(lua_State* L, int index) requires (!std::is_convertible_v<T, void*>)
+        static T get(lua_State* L, int index, int& offset) requires (!std::is_convertible_v<T, void*>)
         {
+            index += offset;
             if (!is(L, index))
             {
                 luaL_typeerror(L, index, type_name(L));
@@ -643,9 +650,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_isnumber(L, index);
         }
-        static int get(lua_State* L, int index)
+        static int get(lua_State* L, int index, int& offset)
         {
-            return (int32_t)lua_tonumber(L, index);
+            return (int32_t)lua_tonumber(L, index+offset);
         }
         static const char* type_name(lua_State* L) {
             return "integer";
@@ -669,9 +676,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_isnumber(L, index);
         }
-        static unsigned int get(lua_State* L, int index)
+        static unsigned int get(lua_State* L, int index, int& offset)
         {
-            return lua_touinteger(L, index);
+            return lua_touinteger(L, index+offset);
         }
         static const char* type_name(lua_State* L) {
             return "unsigned integer";
@@ -717,9 +724,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_isnumber(L, index);
         }
-        static T get(lua_State* L, int index)
+        static T get(lua_State* L, int index, int& offset)
         {
-            return (T)lua_tonumber(L, index);
+            return (T)lua_tonumber(L, index+offset);
         }
         static const char* type_name(lua_State* L) {
             return "number";
@@ -743,9 +750,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_isnumber(L, index);
         }
-        static T get(lua_State* L, int index)
+        static T get(lua_State* L, int index, int& offset)
         {
-            return (T)lua_tonumber(L, index);
+            return (T)lua_tonumber(L, index+offset);
         }
         static const char* type_name(lua_State* L) {
             return "integer";
@@ -769,9 +776,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_isstring(L, index);
         }
-        static T get(lua_State* L, int index)
+        static T get(lua_State* L, int index, int& offset)
         {
-            return (T)luaL_tolstring(L, index, nullptr);
+            return (T)luaL_tolstring(L, index+offset, nullptr);
         }
         static const char* type_name(lua_State* L) {
             return "string";
@@ -795,9 +802,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int) {
             return true;
         }
-        static bool get(lua_State* L, int index)
+        static bool get(lua_State* L, int index, int& offset)
         {
-            return lua_toboolean(L, index);
+            return lua_toboolean(L, index+offset);
         }
         static const char* type_name(lua_State* L) {
             return "boolean";
@@ -821,9 +828,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_isstring(L, index);
         }
-        static char* get(lua_State* L, int index)
+        static char* get(lua_State* L, int index, int& offset)
         {
-            return (char*)luaL_tolstring(L, index, nullptr);
+            return (char*)luaL_tolstring(L, index+offset, nullptr);
         }
         static const char* type_name(lua_State* L) {
             return "string";
@@ -847,9 +854,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_isstring(L, index);
         }
-        static const char* get(lua_State* L, int index)
+        static const char* get(lua_State* L, int index, int& offset)
         {
-            return luaL_tolstring(L, index, nullptr);
+            return luaL_tolstring(L, index+offset, nullptr);
         }
         static const char* type_name(lua_State* L) {
             return "string";
@@ -873,10 +880,10 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_isstring(L, index);
         }
-        static std::string get(lua_State* L, int index)
+        static std::string get(lua_State* L, int index, int& offset)
         {
             size_t len;
-            return { luaL_tolstring(L, index, &len), len };
+            return { luaL_tolstring(L, index+offset, &len), len };
         }
         static const char* type_name(lua_State* L) {
             return "string";
@@ -909,11 +916,11 @@ namespace LuaBinding {
             }
             return StackClass<T>::is(L, index);
         }
-        static std::optional<T> get(lua_State* L, int index)
+        static std::optional<T> get(lua_State* L, int index, int& offset)
         {
-            if (lua_isnoneornil(L, index))
+            if (lua_isnoneornil(L, index+offset))
                 return std::nullopt;
-            return detail::get<T>(L, index);
+            return detail::get<T>(L, index+offset);
         }
         static const char* type_name(lua_State* L) {
             if constexpr (detail::is_pushable<T>)
@@ -964,9 +971,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_istable(L, index);
         }
-        static std::tuple<Params...> get(lua_State* L, int index)
+        static std::tuple<Params...> get(lua_State* L, int index, int& offset)
         {
-            auto tbl = lua_absindex(L, index);
+            auto tbl = lua_absindex(L, index+offset);
             auto top = lua_gettop(L);
             for (auto i = 1; i <= sizeof...(Params); i++)
             {
@@ -1002,16 +1009,16 @@ namespace LuaBinding {
             lua_createtable(L, 2, 0);
             detail::push<K>(L, t.first);
             lua_rawseti(L, -2, 1);
-            detail::push<K>(L, t.second);
+            detail::push<V>(L, t.second);
             lua_rawseti(L, -2, 2);
             return 1;
         }
         static bool is(lua_State* L, int index) {
             return lua_istable(L, index);
         }
-        static std::pair<K, V> get(lua_State* L, int index)
+        static std::pair<K, V> get(lua_State* L, int index, int& offset)
         {
-            index = lua_absindex(L, index);
+            index = lua_absindex(L, index+offset);
             lua_geti(L, index, 1);
             lua_geti(L, index, 2);
             std::pair<K, V> t = { detail::get<K>(L, -2), detail::get<V>(L, -1) };
@@ -1057,9 +1064,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_istable(L, index);
         }
-        static std::vector<T> get(lua_State* L, int index)
+        static std::vector<T> get(lua_State* L, int index, int& offset)
         {
-            index = lua_absindex(L, index);
+            index = lua_absindex(L, index+offset);
             size_t len = lua_getlen(L, index);
             std::vector<T> result;
             result.reserve(len);
@@ -1105,9 +1112,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_istable(L, index);
         }
-        static std::vector<T>* get(lua_State* L, int index)
+        static std::vector<T>* get(lua_State* L, int index, int& offset)
         {
-            index = lua_absindex(L, index);
+            index = lua_absindex(L, index+offset);
             size_t len = lua_getlen(L, index);
             auto result = new std::vector<T>();
             result->reserve(len);
@@ -1154,9 +1161,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_istable(L, index);
         }
-        static std::list<T> get(lua_State* L, int index)
+        static std::list<T> get(lua_State* L, int index, int& offset)
         {
-            index = lua_absindex(L, index);
+            index = lua_absindex(L, index+offset);
             size_t len = lua_getlen(L, index);
             std::list<T> result;
             result.reserve(len);
@@ -1203,9 +1210,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_istable(L, index);
         }
-        static std::stack<T> get(lua_State* L, int index)
+        static std::stack<T> get(lua_State* L, int index, int& offset)
         {
-            index = lua_absindex(L, index);
+            index = lua_absindex(L, index+offset);
             size_t len = lua_getlen(L, index);
             std::stack<T> result;
             result.reserve(len);
@@ -1252,9 +1259,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_istable(L, index);
         }
-        static std::queue<T> get(lua_State* L, int index)
+        static std::queue<T> get(lua_State* L, int index, int& offset)
         {
-            index = lua_absindex(L, index);
+            index = lua_absindex(L, index+offset);
             size_t len = lua_getlen(L, index);
             std::queue<T> result;
             result.reserve(len);
@@ -1301,9 +1308,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_istable(L, index);
         }
-        static std::deque<T> get(lua_State* L, int index)
+        static std::deque<T> get(lua_State* L, int index, int& offset)
         {
-            index = lua_absindex(L, index);
+            index = lua_absindex(L, index+offset);
             size_t len = lua_getlen(L, index);
             std::deque<T> result;
             result.reserve(len);
@@ -1350,9 +1357,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_istable(L, index);
         }
-        static std::set<T> get(lua_State* L, int index)
+        static std::set<T> get(lua_State* L, int index, int& offset)
         {
-            index = lua_absindex(L, index);
+            index = lua_absindex(L, index+offset);
             size_t len = lua_getlen(L, index);
             std::set<T> result;
             result.reserve(len);
@@ -1399,9 +1406,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_istable(L, index);
         }
-        static std::unordered_set<T> get(lua_State* L, int index)
+        static std::unordered_set<T> get(lua_State* L, int index, int& offset)
         {
-            index = lua_absindex(L, index);
+            index = lua_absindex(L, index+offset);
             size_t len = lua_getlen(L, index);
             std::unordered_set<T> result;
             result.reserve(len);
@@ -1447,9 +1454,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_istable(L, index);
         }
-        static std::array <T, size> get(lua_State* L, int index)
+        static std::array <T, size> get(lua_State* L, int index, int& offset)
         {
-            index = lua_absindex(L, index);
+            index = lua_absindex(L, index+offset);
             std::array <T, size> result;
             for (auto i = 0; i < size; i++)
             {
@@ -1494,9 +1501,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_istable(L, index);
         }
-        static std::map<K, V> get(lua_State* L, int index)
+        static std::map<K, V> get(lua_State* L, int index, int& offset)
         {
-            index = lua_absindex(L, index);
+            index = lua_absindex(L, index+offset);
             std::map<K, V> result;
             lua_pushnil(L);
             while (lua_next(L, index))
@@ -1546,9 +1553,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_istable(L, index);
         }
-        static std::unordered_map<K, V> get(lua_State* L, int index)
+        static std::unordered_map<K, V> get(lua_State* L, int index, int& offset)
         {
-            index = lua_absindex(L, index);
+            index = lua_absindex(L, index+offset);
             std::unordered_map<K, V> result;
             lua_pushnil(L);
             while (lua_next(L, index))
@@ -2989,9 +2996,9 @@ namespace LuaBinding {
         static bool is(lua_State*, int ) {
             return true;
         }
-        static Object get(lua_State* L, int index)
+        static Object get(lua_State* L, int index, int& offset)
         {
-            return Object(L, index);
+            return Object(L, index + offset);
         }
         static const char* basic_type_name(lua_State* L) {
             return "object";
@@ -3013,7 +3020,7 @@ namespace LuaBinding {
             static_assert(true, "Use ObjectRef or ObjectRef& instead of ObjectRef*");
             return false;
         }
-        static Object* get(lua_State* L, int index)
+        static Object* get(lua_State* L, int index, int& offset)
         {
             static_assert(true, "Use ObjectRef or ObjectRef& instead of ObjectRef*");
             return nullptr;
@@ -3030,9 +3037,9 @@ namespace LuaBinding {
         static bool is(lua_State*, int ) {
             return true;
         }
-        static ObjectRef get(lua_State* L, int index)
+        static ObjectRef get(lua_State* L, int index, int& offset)
         {
-            return {L, index, true};
+            return {L, index+offset, true};
         }
         static const char* basic_type_name(lua_State* L) {
             return "object";
@@ -3054,7 +3061,7 @@ namespace LuaBinding {
             static_assert(true, "Use ObjectRef or ObjectRef& instead of ObjectRef*");
             return false;
         }
-        static ObjectRef* get(lua_State* L, int index)
+        static ObjectRef* get(lua_State* L, int index, int& offset)
         {
             static_assert(true, "Use ObjectRef or ObjectRef& instead of ObjectRef*");
             return nullptr;
@@ -3071,7 +3078,7 @@ namespace LuaBinding {
         static bool is(lua_State*, int ) {
             return true;
         }
-        static IndexProxy get(lua_State* L, int index)
+        static IndexProxy get(lua_State* L, int index, int& offset)
         {
             static_assert(true, "Cannot get IndexProxy from lua stack");
         }
@@ -3095,7 +3102,7 @@ namespace LuaBinding {
             static_assert(true, "Use IndexProxy or IndexProxy& instead of IndexProxy*");
             return false;
         }
-        static IndexProxy* get(lua_State* L, int index)
+        static IndexProxy* get(lua_State* L, int index, int& offset)
         {
             static_assert(true, "Use IndexProxy or IndexProxy& instead of IndexProxy*");
             return nullptr;
@@ -3281,9 +3288,9 @@ namespace LuaBinding {
         {
             char asdf[128] = { 0 };
 #ifdef ENV32
-                snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
+            snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
 #elifdef ENV64
-                snprintf(asdf, sizeof(asdf), "%s{%llX}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
+            snprintf(asdf, sizeof(asdf), "%s{%llX}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
 #endif
             lua_pushstring(S, asdf);
             return 1;
@@ -3325,9 +3332,9 @@ namespace LuaBinding {
                     if (luaL_getmetafield(S, 1, "__name")) {
                         char asdf[128] = { 0 };
 #ifdef ENV32
-                            snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, -1), (uintptr_t)topointer(S, 1));
+                        snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, -1), (uintptr_t)topointer(S, 1));
 #elifdef ENV64
-                            snprintf(asdf, sizeof(asdf), "%s{%llX}", lua_tostring(S, -1), (uintptr_t)topointer(S, 1));
+                        snprintf(asdf, sizeof(asdf), "%s{%llX}", lua_tostring(S, -1), (uintptr_t)topointer(S, 1));
 #endif
                         lua_pop(S, 1);
 
@@ -3409,10 +3416,11 @@ namespace LuaBinding {
             }
             if (assert)
             {
-                if constexpr (sizeof(ptrdiff_t) == 4)
-                    luaL_error(L, "metatable not found in __METASTORE for %X", _this);
-                else if constexpr (sizeof(ptrdiff_t) == 8)
-                    luaL_error(L, "metatable not found in __METASTORE for %llX", _this);
+#ifdef ENV32
+                luaL_error(L, "metatable not found in __METASTORE for %X", _this);
+#elifdef ENV64
+                luaL_error(L, "metatable not found in __METASTORE for %llX", _this);
+#endif
             }
             lua_pop(L, 1);
             lua_newtable(L);
@@ -3779,9 +3787,9 @@ namespace LuaBinding {
         {
             char asdf[128] = { 0 };
 #ifdef ENV32
-            snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
+                snprintf(asdf, sizeof(asdf), "%s{%X}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
 #elifdef ENV64
-            snprintf(asdf, sizeof(asdf), "%s{%llX}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
+                snprintf(asdf, sizeof(asdf), "%s{%llX}", lua_tostring(S, lua_upvalueindex(1)), (uintptr_t)topointer(S, 1));
 #endif
             lua_pushstring(S, asdf);
             return 1;
@@ -5221,7 +5229,7 @@ namespace LuaBinding {
                         luaL_typeerror(L, I + 1, StackClass<Type>::type_name(L));
                     }
                 else {
-                    std::get<I>(tup) = (Type)StackClass<Type>::get(L, I + 1 + J);
+                    std::get<I>(tup) = (Type)StackClass<Type>::get(L, I + 1, J);
                 }
                 assign_tup<I + 1>(L, tup, J);
             }
@@ -5238,7 +5246,7 @@ namespace LuaBinding {
                         luaL_typeerror(L, I + 1 + J, Stack<Type>::type_name(L));
                 else
                 {
-                    std::get<I>(tup) = (Type)Stack<Type>::get(L, I + 1 + J);
+                    std::get<I>(tup) = (Type)Stack<Type>::get(L, I + 1, J);
                 }
                 assign_tup<I + 1>(L, tup, J);
             }
@@ -5395,7 +5403,8 @@ namespace LuaBinding {
     class TraitsClassCFunc {
     public:
         static int f(lua_State* L) {
-            auto t = StackClass<T*>::get(L, 1);
+            int offset = 0;
+            auto t = StackClass<T*>::get(L, 1, offset);
             auto fnptr = reinterpret_cast <int(T::**)(State)> (lua_touserdata(L, lua_upvalueindex(1)));
             return (t->**fnptr)(State(L));
         }
@@ -5404,7 +5413,8 @@ namespace LuaBinding {
     class TraitsClassFunCFunc {
     public:
         static int f(lua_State* L) {
-            auto t = StackClass<T*>::get(L, 1);
+            int offset = 0;
+            auto t = StackClass<T*>::get(L, 1, offset);
             auto fnptr = *reinterpret_cast <std::function<int(T*, State)>*> (lua_touserdata(L, lua_upvalueindex(1)));
             return fnptr(t, State(L));
         }
@@ -5414,7 +5424,8 @@ namespace LuaBinding {
         using func = int(T::*)(lua_State*);
     public:
         static int f(lua_State* L) {
-            auto t = StackClass<T*>::get(L, 1);
+            int offset = 0;
+            auto t = StackClass<T*>::get(L, 1, offset);
             auto fnptr = (func*)lua_touserdata(L, lua_upvalueindex(1));
             return (t->**fnptr)(L);
         }
@@ -5424,7 +5435,8 @@ namespace LuaBinding {
         using func = int(T::*)(lua_State*);
     public:
         static int f(lua_State* L) {
-            auto t = StackClass<T*>::get(L, 1);
+            int offset = 0;
+            auto t = StackClass<T*>::get(L, 1, offset);
             auto fnptr = *reinterpret_cast <std::function<int(T*, lua_State*)>*> (lua_touserdata(L, lua_upvalueindex(1)));
             return fnptr(t, L);
         }
@@ -5443,13 +5455,15 @@ namespace LuaBinding {
         using prop = R(T::*);
     public:
         static int set(lua_State* L) {
-            auto t = StackClass<T*>::get(L, 1);
+            int offset = 0;
+            auto t = StackClass<T*>::get(L, 1, offset);
             auto p = (prop*)lua_touserdata(L, lua_upvalueindex(1));
             t->**p = detail::get<R>(L, 3);
             return 0;
         }
         static int get(lua_State* L) {
-            auto t = StackClass<T*>::get(L, 1);
+            int offset = 0;
+            auto t = StackClass<T*>::get(L, 1, offset);
             auto p = (prop*)lua_touserdata(L, lua_upvalueindex(1));
             return detail::push(L, t->**p);
         }
@@ -5477,13 +5491,15 @@ namespace LuaBinding {
         using get_t = R(T::*)();
     public:
         static int set(lua_State* L) {
-            auto t = StackClass<T*>::get(L, 1);
+            int offset = 0;
+            auto t = StackClass<T*>::get(L, 1, offset);
             auto p = (set_t*)lua_touserdata(L, lua_upvalueindex(1));
             (t->**p)(detail::get<R>(L, 3));
             return 0;
         }
         static int get(lua_State* L) {
-            auto t = StackClass<T*>::get(L, 1);
+            int offset = 0;
+            auto t = StackClass<T*>::get(L, 1, offset);
             auto p = (get_t*)lua_touserdata(L, lua_upvalueindex(1));
             return detail::push(L, (t->**p)());
         }
@@ -5511,13 +5527,15 @@ namespace LuaBinding {
         using get_t = std::function<R(T*)>;
     public:
         static int set(lua_State* L) {
-            auto t = StackClass<T*>::get(L, 1);
+            int offset = 0;
+            auto t = StackClass<T*>::get(L, 1, offset);
             auto p = *(set_t*)lua_touserdata(L, lua_upvalueindex(1));
             p(t, detail::get<R>(L, 3));
             return 0;
         }
         static int get(lua_State* L) {
-            auto t = StackClass<T*>::get(L, 1);
+            int offset = 0;
+            auto t = StackClass<T*>::get(L, 1, offset);
             auto p = *(get_t*)lua_touserdata(L, lua_upvalueindex(1));
             detail::push(L, p(t));
             return 1;
@@ -5562,13 +5580,15 @@ namespace LuaBinding {
         using get_t = std::function<int(T*, lua_State*)>;
     public:
         static int set(lua_State* L) {
-            auto t = StackClass<T*>::get(L, 1);
+            int offset = 0;
+            auto t = StackClass<T*>::get(L, 1, offset);
             auto p = *(set_t*)lua_touserdata(L, lua_upvalueindex(1));
             auto fnptr = *reinterpret_cast <std::function<int(T*, lua_State*)>*> (lua_touserdata(L, lua_upvalueindex(1)));
             return fnptr(t, L);
         }
         static int get(lua_State* L) {
-            auto t = StackClass<T*>::get(L, 1);
+            int offset = 0;
+            auto t = StackClass<T*>::get(L, 1, offset);
             auto p = *(get_t*)lua_touserdata(L, lua_upvalueindex(1));
             auto fnptr = *reinterpret_cast <std::function<int(T*, lua_State*)>*> (lua_touserdata(L, lua_upvalueindex(1)));
             return fnptr(t, L);
@@ -5598,12 +5618,14 @@ namespace LuaBinding {
         using get_t = std::function<int(T*, State)>;
     public:
         static int set(lua_State* L) {
-            auto t = StackClass<T*>::get(L, 1);
+            int offset = 0;
+            auto t = StackClass<T*>::get(L, 1, offset);
             auto fnptr = *reinterpret_cast <std::function<int(T*, State)>*> (lua_touserdata(L, lua_upvalueindex(1)));
             return fnptr(t, State(L));
         }
         static int get(lua_State* L) {
-            auto t = StackClass<T*>::get(L, 1);
+            int offset = 0;
+            auto t = StackClass<T*>::get(L, 1, offset);
             auto fnptr = *reinterpret_cast <std::function<int(T*, State)>*> (lua_touserdata(L, lua_upvalueindex(1)));
             return fnptr(t, State(L));
         }
@@ -5630,12 +5652,14 @@ namespace LuaBinding {
         using get_t = int(T::*)(State);
     public:
         static int set(lua_State* L) {
-            auto t = StackClass<T*>::get(L, 1);
+            int offset = 0;
+            auto t = StackClass<T*>::get(L, 1, offset);
             auto fnptr = reinterpret_cast <set_t*> (lua_touserdata(L, lua_upvalueindex(1)));
             return (t->**fnptr)(State(L));
         }
         static int get(lua_State* L) {
-            auto t = StackClass<T*>::get(L, 1);
+            int offset = 0;
+            auto t = StackClass<T*>::get(L, 1, offset);
             auto fnptr = reinterpret_cast <get_t*> (lua_touserdata(L, lua_upvalueindex(1)));
             return (t->**fnptr)(State(L));
         }

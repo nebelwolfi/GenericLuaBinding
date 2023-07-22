@@ -22,19 +22,22 @@ namespace LuaBinding {
         template<class T> requires is_pushable<T>
         T get(lua_State* L, int index)
         {
-            return Stack<T>::get(L, index);
+            int offset = 0;
+            return Stack<T>::get(L, index, offset);
         }
 
         template<class T> requires (!is_pushable<T>)
         T get(lua_State* L, int index)
         {
-            return StackClass<T>::get(L, index);
+            int offset = 0;
+            return StackClass<T>::get(L, index, offset);
         }
 
         template<class T> requires is_pushable<T>
         T extract(lua_State* L, int index)
         {
-            auto r = Stack<T>::get(L, index);
+            int offset = 0;
+            auto r = Stack<T>::get(L, index, offset);
             lua_remove(L, index);
             return r;
         }
@@ -42,7 +45,8 @@ namespace LuaBinding {
         template<class T> requires (!is_pushable<T>)
         T extract(lua_State* L, int index)
         {
-            auto r = StackClass<T>::get(L, index);
+            int offset = 0;
+            auto r = StackClass<T>::get(L, index, offset);
             lua_remove(L, index);
             return r;
         }
@@ -129,7 +133,7 @@ namespace LuaBinding {
             static_assert(sizeof(T) == 0, "Unspecialized use of Stack<T>::push");
         }
         static bool is(lua_State* L, int index) = delete;
-        static T get(lua_State* L, int index) {
+        static T get(lua_State* L, int index, int& offset) {
             static_assert(sizeof(T) == 0, "Unspecialized use of Stack<T>::get");
         }
         static const char* type_name(lua_State* L) {
@@ -231,8 +235,9 @@ namespace LuaBinding {
         static int basic_type(lua_State* L) {
             return LUA_TUSERDATA;
         }
-        static T get(lua_State* L, int index) requires (std::is_convertible_v<T, void*>)
+        static T get(lua_State* L, int index, int& offset) requires (std::is_convertible_v<T, void*>)
         {
+            index += offset;
             if (!is(L, index))
             {
                 if constexpr (std::is_convertible_v<T, void*>)
@@ -246,8 +251,9 @@ namespace LuaBinding {
 #endif
             return *(T*)lua_touserdata(L, index);
         }
-        static T get(lua_State* L, int index) requires (!std::is_convertible_v<T, void*>)
+        static T get(lua_State* L, int index, int& offset) requires (!std::is_convertible_v<T, void*>)
         {
+            index += offset;
             if (!is(L, index))
             {
                 luaL_typeerror(L, index, type_name(L));
@@ -272,9 +278,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_isnumber(L, index);
         }
-        static int get(lua_State* L, int index)
+        static int get(lua_State* L, int index, int& offset)
         {
-            return (int32_t)lua_tonumber(L, index);
+            return (int32_t)lua_tonumber(L, index+offset);
         }
         static const char* type_name(lua_State* L) {
             return "integer";
@@ -298,9 +304,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_isnumber(L, index);
         }
-        static unsigned int get(lua_State* L, int index)
+        static unsigned int get(lua_State* L, int index, int& offset)
         {
-            return lua_touinteger(L, index);
+            return lua_touinteger(L, index+offset);
         }
         static const char* type_name(lua_State* L) {
             return "unsigned integer";
@@ -346,9 +352,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_isnumber(L, index);
         }
-        static T get(lua_State* L, int index)
+        static T get(lua_State* L, int index, int& offset)
         {
-            return (T)lua_tonumber(L, index);
+            return (T)lua_tonumber(L, index+offset);
         }
         static const char* type_name(lua_State* L) {
             return "number";
@@ -372,9 +378,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_isnumber(L, index);
         }
-        static T get(lua_State* L, int index)
+        static T get(lua_State* L, int index, int& offset)
         {
-            return (T)lua_tonumber(L, index);
+            return (T)lua_tonumber(L, index+offset);
         }
         static const char* type_name(lua_State* L) {
             return "integer";
@@ -398,9 +404,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_isstring(L, index);
         }
-        static T get(lua_State* L, int index)
+        static T get(lua_State* L, int index, int& offset)
         {
-            return (T)luaL_tolstring(L, index, nullptr);
+            return (T)luaL_tolstring(L, index+offset, nullptr);
         }
         static const char* type_name(lua_State* L) {
             return "string";
@@ -424,9 +430,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int) {
             return true;
         }
-        static bool get(lua_State* L, int index)
+        static bool get(lua_State* L, int index, int& offset)
         {
-            return lua_toboolean(L, index);
+            return lua_toboolean(L, index+offset);
         }
         static const char* type_name(lua_State* L) {
             return "boolean";
@@ -450,9 +456,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_isstring(L, index);
         }
-        static char* get(lua_State* L, int index)
+        static char* get(lua_State* L, int index, int& offset)
         {
-            return (char*)luaL_tolstring(L, index, nullptr);
+            return (char*)luaL_tolstring(L, index+offset, nullptr);
         }
         static const char* type_name(lua_State* L) {
             return "string";
@@ -476,9 +482,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_isstring(L, index);
         }
-        static const char* get(lua_State* L, int index)
+        static const char* get(lua_State* L, int index, int& offset)
         {
-            return luaL_tolstring(L, index, nullptr);
+            return luaL_tolstring(L, index+offset, nullptr);
         }
         static const char* type_name(lua_State* L) {
             return "string";
@@ -502,10 +508,10 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_isstring(L, index);
         }
-        static std::string get(lua_State* L, int index)
+        static std::string get(lua_State* L, int index, int& offset)
         {
             size_t len;
-            return { luaL_tolstring(L, index, &len), len };
+            return { luaL_tolstring(L, index+offset, &len), len };
         }
         static const char* type_name(lua_State* L) {
             return "string";
@@ -538,11 +544,11 @@ namespace LuaBinding {
             }
             return StackClass<T>::is(L, index);
         }
-        static std::optional<T> get(lua_State* L, int index)
+        static std::optional<T> get(lua_State* L, int index, int& offset)
         {
-            if (lua_isnoneornil(L, index))
+            if (lua_isnoneornil(L, index+offset))
                 return std::nullopt;
-            return detail::get<T>(L, index);
+            return detail::get<T>(L, index+offset);
         }
         static const char* type_name(lua_State* L) {
             if constexpr (detail::is_pushable<T>)
@@ -593,9 +599,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_istable(L, index);
         }
-        static std::tuple<Params...> get(lua_State* L, int index)
+        static std::tuple<Params...> get(lua_State* L, int index, int& offset)
         {
-            auto tbl = lua_absindex(L, index);
+            auto tbl = lua_absindex(L, index+offset);
             auto top = lua_gettop(L);
             for (auto i = 1; i <= sizeof...(Params); i++)
             {
@@ -631,16 +637,16 @@ namespace LuaBinding {
             lua_createtable(L, 2, 0);
             detail::push<K>(L, t.first);
             lua_rawseti(L, -2, 1);
-            detail::push<K>(L, t.second);
+            detail::push<V>(L, t.second);
             lua_rawseti(L, -2, 2);
             return 1;
         }
         static bool is(lua_State* L, int index) {
             return lua_istable(L, index);
         }
-        static std::pair<K, V> get(lua_State* L, int index)
+        static std::pair<K, V> get(lua_State* L, int index, int& offset)
         {
-            index = lua_absindex(L, index);
+            index = lua_absindex(L, index+offset);
             lua_geti(L, index, 1);
             lua_geti(L, index, 2);
             std::pair<K, V> t = { detail::get<K>(L, -2), detail::get<V>(L, -1) };
@@ -686,9 +692,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_istable(L, index);
         }
-        static std::vector<T> get(lua_State* L, int index)
+        static std::vector<T> get(lua_State* L, int index, int& offset)
         {
-            index = lua_absindex(L, index);
+            index = lua_absindex(L, index+offset);
             size_t len = lua_getlen(L, index);
             std::vector<T> result;
             result.reserve(len);
@@ -734,9 +740,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_istable(L, index);
         }
-        static std::vector<T>* get(lua_State* L, int index)
+        static std::vector<T>* get(lua_State* L, int index, int& offset)
         {
-            index = lua_absindex(L, index);
+            index = lua_absindex(L, index+offset);
             size_t len = lua_getlen(L, index);
             auto result = new std::vector<T>();
             result->reserve(len);
@@ -783,9 +789,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_istable(L, index);
         }
-        static std::list<T> get(lua_State* L, int index)
+        static std::list<T> get(lua_State* L, int index, int& offset)
         {
-            index = lua_absindex(L, index);
+            index = lua_absindex(L, index+offset);
             size_t len = lua_getlen(L, index);
             std::list<T> result;
             result.reserve(len);
@@ -832,9 +838,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_istable(L, index);
         }
-        static std::stack<T> get(lua_State* L, int index)
+        static std::stack<T> get(lua_State* L, int index, int& offset)
         {
-            index = lua_absindex(L, index);
+            index = lua_absindex(L, index+offset);
             size_t len = lua_getlen(L, index);
             std::stack<T> result;
             result.reserve(len);
@@ -881,9 +887,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_istable(L, index);
         }
-        static std::queue<T> get(lua_State* L, int index)
+        static std::queue<T> get(lua_State* L, int index, int& offset)
         {
-            index = lua_absindex(L, index);
+            index = lua_absindex(L, index+offset);
             size_t len = lua_getlen(L, index);
             std::queue<T> result;
             result.reserve(len);
@@ -930,9 +936,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_istable(L, index);
         }
-        static std::deque<T> get(lua_State* L, int index)
+        static std::deque<T> get(lua_State* L, int index, int& offset)
         {
-            index = lua_absindex(L, index);
+            index = lua_absindex(L, index+offset);
             size_t len = lua_getlen(L, index);
             std::deque<T> result;
             result.reserve(len);
@@ -979,9 +985,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_istable(L, index);
         }
-        static std::set<T> get(lua_State* L, int index)
+        static std::set<T> get(lua_State* L, int index, int& offset)
         {
-            index = lua_absindex(L, index);
+            index = lua_absindex(L, index+offset);
             size_t len = lua_getlen(L, index);
             std::set<T> result;
             result.reserve(len);
@@ -1028,9 +1034,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_istable(L, index);
         }
-        static std::unordered_set<T> get(lua_State* L, int index)
+        static std::unordered_set<T> get(lua_State* L, int index, int& offset)
         {
-            index = lua_absindex(L, index);
+            index = lua_absindex(L, index+offset);
             size_t len = lua_getlen(L, index);
             std::unordered_set<T> result;
             result.reserve(len);
@@ -1076,9 +1082,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_istable(L, index);
         }
-        static std::array <T, size> get(lua_State* L, int index)
+        static std::array <T, size> get(lua_State* L, int index, int& offset)
         {
-            index = lua_absindex(L, index);
+            index = lua_absindex(L, index+offset);
             std::array <T, size> result;
             for (auto i = 0; i < size; i++)
             {
@@ -1123,9 +1129,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_istable(L, index);
         }
-        static std::map<K, V> get(lua_State* L, int index)
+        static std::map<K, V> get(lua_State* L, int index, int& offset)
         {
-            index = lua_absindex(L, index);
+            index = lua_absindex(L, index+offset);
             std::map<K, V> result;
             lua_pushnil(L);
             while (lua_next(L, index))
@@ -1175,9 +1181,9 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_istable(L, index);
         }
-        static std::unordered_map<K, V> get(lua_State* L, int index)
+        static std::unordered_map<K, V> get(lua_State* L, int index, int& offset)
         {
-            index = lua_absindex(L, index);
+            index = lua_absindex(L, index+offset);
             std::unordered_map<K, V> result;
             lua_pushnil(L);
             while (lua_next(L, index))
