@@ -75,9 +75,10 @@
                 return lua_equal(L, idx1, idx2);
             case LUA_OPLT:
                 return lua_lessthan(L, idx1, idx2);
-            case LUA_OPLE:
+            case LUA_OPLE: {
                 auto Res = lua_equal(L, idx1, idx2) || lua_lessthan(L, idx1, idx2);
                 return Res;
+            }
             default:
                 return 0;
         };
