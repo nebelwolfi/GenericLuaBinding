@@ -25,6 +25,9 @@ Tested against LuaJIT 2.1 x86 and Lua 5.4 x86, will happily fix compats with oth
 ## 🔧 Quick and Dirty <a name="quick_and_dirty"></a>
 ```cpp
 #include <lua.hpp>
+namespace LuaBinding {
+    using string_type = std::string;
+}
 #include <LuaBinding.h>
 ```
 #### standalone example
