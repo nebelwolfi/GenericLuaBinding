@@ -277,8 +277,8 @@ namespace LuaBinding {
         template<class... Params>
         Class<T>& ctor()
         {
-            auto str = std::string(class_name);
-            if (str.find('.') != std::string::npos)
+            auto str = string_type(class_name);
+            if (str.find('.') != string_type::npos)
             {
                 auto enclosing_table = str.substr(0, str.find('.'));
                 auto real_class_name = str.substr(str.find('.') + 1);

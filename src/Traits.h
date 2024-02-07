@@ -159,6 +159,7 @@ namespace LuaBinding {
         }
     };
 
+    template <class T>
     class TraitsCFunc {
     public:
         static int f(lua_State* L) {

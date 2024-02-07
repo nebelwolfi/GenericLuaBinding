@@ -220,7 +220,7 @@ namespace LuaBinding {
                     else
                         printfun("%s[%s] = {\n", tabs, lua_tostring(L, -2));
                     if (strlen(tabs) < 4)
-                        TableDump(L, -1, printfun, (std::string(tabs) + "\t").c_str());
+                        TableDump(L, -1, printfun, (string_type(tabs) + "\t").c_str());
                     printfun("%s}\n", tabs);
                     break;
                 case LUA_TSTRING:  /* strings */
@@ -323,6 +323,7 @@ namespace LuaBinding {
     class TraitsCtor;
     template <class R, class... Params>
     class TraitsSTDFunction;
+    template <class T>
     class TraitsCFunc;
     template <class R, class T, class... Params>
     class TraitsClass;
@@ -870,9 +871,9 @@ namespace LuaBinding {
     };
 
     template<>
-    class Stack<std::string> {
+    class Stack<string_type> {
     public:
-        static int push(lua_State* L, std::string t)
+        static int push(lua_State* L, string_type t)
         {
             lua_pushstring(L, t.c_str());
             return 1;
@@ -880,7 +881,7 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_isstring(L, index);
         }
-        static std::string get(lua_State* L, int index, int& offset)
+        static string_type get(lua_State* L, int index, int& offset)
         {
             size_t len;
             return { luaL_tolstring(L, index+offset, &len), len };
@@ -1723,7 +1724,7 @@ namespace LuaBinding {
         {
             using FnType = decltype (func);
             new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsCFunc::f, 1);
+            lua_pushcclosure(L, TraitsCFunc<T>::f, 1);
         }
         
         template <class T, class F>
@@ -3951,8 +3952,8 @@ namespace LuaBinding {
         template<class... Params>
         Class<T>& ctor()
         {
-            auto str = std::string(class_name);
-            if (str.find('.') != std::string::npos)
+            auto str = string_type(class_name);
+            if (str.find('.') != string_type::npos)
             {
                 auto enclosing_table = str.substr(0, str.find('.'));
                 auto real_class_name = str.substr(str.find('.') + 1);
@@ -4649,7 +4650,7 @@ namespace LuaBinding {
             return sizeof...(p);
         }
 
-        template<class T, class ...Params> requires std::is_constructible_v<T>
+        template<class T, class ...Params> requires std::is_constructible_v<T, Params...>
         T* alloc(Params... params)
         {
             auto t = new (malloc(sizeof(T))) T(params...);
@@ -4660,7 +4661,7 @@ namespace LuaBinding {
             return t;
         }
 
-        template<class T, class ...Params> requires (!std::is_constructible_v<T>)
+        template<class T, class ...Params> requires (!std::is_constructible_v<T, Params...>)
         T* alloc()
         {
             auto t = (T*)malloc(sizeof(T));
@@ -4681,8 +4682,8 @@ namespace LuaBinding {
         template <class F>
         void fun(const char* name, F& func)
         {
-            auto str = std::string(name);
-            if (str.find('.') != std::string::npos)
+            auto str = string_type(name);
+            if (str.find('.') != string_type::npos)
             {
                 auto enclosing_table = str.substr(0, str.find('.'));
                 auto real_class_name = str.substr(str.find('.') + 1);
@@ -4711,8 +4712,8 @@ namespace LuaBinding {
         template <class F>
         void fun(const char* name, F&& func)
         {
-            auto str = std::string(name);
-            if (str.find('.') != std::string::npos)
+            auto str = string_type(name);
+            if (str.find('.') != string_type::npos)
             {
                 auto enclosing_table = str.substr(0, str.find('.'));
                 auto real_class_name = str.substr(str.find('.') + 1);
@@ -4741,8 +4742,8 @@ namespace LuaBinding {
         template <class F>
         void cfun(const char* name, F& func)
         {
-            auto str = std::string(name);
-            if (str.find('.') != std::string::npos)
+            auto str = string_type(name);
+            if (str.find('.') != string_type::npos)
             {
                 auto enclosing_table = str.substr(0, str.find('.'));
                 auto real_class_name = str.substr(str.find('.') + 1);
@@ -4771,8 +4772,8 @@ namespace LuaBinding {
         template <class F>
         void cfun(const char* name, F&& func)
         {
-            auto str = std::string(name);
-            if (str.find('.') != std::string::npos)
+            auto str = string_type(name);
+            if (str.find('.') != string_type::npos)
             {
                 auto enclosing_table = str.substr(0, str.find('.'));
                 auto real_class_name = str.substr(str.find('.') + 1);
@@ -4848,7 +4849,7 @@ namespace LuaBinding {
             return 0;
         }
 
-        std::string dump(const char* file)
+        string_type dump(const char* file)
         {
             if (luaL_loadfile(L, file))
             {
@@ -4867,7 +4868,7 @@ namespace LuaBinding {
             {
                 luaL_pushresult(&buf);
                 size_t len = 0;
-                auto r = std::string(const_cast<char *>(lua_tolstring(L, -1, &len)), len);
+                auto r = string_type(const_cast<char *>(lua_tolstring(L, -1, &len)), len);
                 lua_pop(L, 2);
                 return r;
             }
@@ -4876,7 +4877,7 @@ namespace LuaBinding {
 #endif
         }
 
-        ObjectRef dump(std::vector<char>& code, std::string fname)
+        ObjectRef dump(std::vector<char>& code, string_type fname)
         {
             if (luaL_loadbuffer(L, code.data(), code.size(), ("=" + fname).c_str()))
             {
@@ -5118,8 +5119,8 @@ namespace LuaBinding {
         template <class T>
         void global(const char* name, T thing)
         {
-            auto str = std::string(name);
-            if (str.find('.') != std::string::npos)
+            auto str = string_type(name);
+            if (str.find('.') != string_type::npos)
             {
                 auto enclosing_table = str.substr(0, str.find('.'));
                 auto real_class_name = str.substr(str.find('.') + 1);
@@ -5323,6 +5324,7 @@ namespace LuaBinding {
         }
     };
 
+    template <class T>
     class TraitsCFunc {
     public:
         static int f(lua_State* L) {

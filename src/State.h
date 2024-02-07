@@ -147,7 +147,7 @@ namespace LuaBinding {
             return sizeof...(p);
         }
 
-        template<class T, class ...Params> requires std::is_constructible_v<T>
+        template<class T, class ...Params> requires std::is_constructible_v<T, Params...>
         T* alloc(Params... params)
         {
             auto t = new (malloc(sizeof(T))) T(params...);
@@ -158,7 +158,7 @@ namespace LuaBinding {
             return t;
         }
 
-        template<class T, class ...Params> requires (!std::is_constructible_v<T>)
+        template<class T, class ...Params> requires (!std::is_constructible_v<T, Params...>)
         T* alloc()
         {
             auto t = (T*)malloc(sizeof(T));
@@ -179,8 +179,8 @@ namespace LuaBinding {
         template <class F>
         void fun(const char* name, F& func)
         {
-            auto str = std::string(name);
-            if (str.find('.') != std::string::npos)
+            auto str = string_type(name);
+            if (str.find('.') != string_type::npos)
             {
                 auto enclosing_table = str.substr(0, str.find('.'));
                 auto real_class_name = str.substr(str.find('.') + 1);
@@ -209,8 +209,8 @@ namespace LuaBinding {
         template <class F>
         void fun(const char* name, F&& func)
         {
-            auto str = std::string(name);
-            if (str.find('.') != std::string::npos)
+            auto str = string_type(name);
+            if (str.find('.') != string_type::npos)
             {
                 auto enclosing_table = str.substr(0, str.find('.'));
                 auto real_class_name = str.substr(str.find('.') + 1);
@@ -239,8 +239,8 @@ namespace LuaBinding {
         template <class F>
         void cfun(const char* name, F& func)
         {
-            auto str = std::string(name);
-            if (str.find('.') != std::string::npos)
+            auto str = string_type(name);
+            if (str.find('.') != string_type::npos)
             {
                 auto enclosing_table = str.substr(0, str.find('.'));
                 auto real_class_name = str.substr(str.find('.') + 1);
@@ -269,8 +269,8 @@ namespace LuaBinding {
         template <class F>
         void cfun(const char* name, F&& func)
         {
-            auto str = std::string(name);
-            if (str.find('.') != std::string::npos)
+            auto str = string_type(name);
+            if (str.find('.') != string_type::npos)
             {
                 auto enclosing_table = str.substr(0, str.find('.'));
                 auto real_class_name = str.substr(str.find('.') + 1);
@@ -346,7 +346,7 @@ namespace LuaBinding {
             return 0;
         }
 
-        std::string dump(const char* file)
+        string_type dump(const char* file)
         {
             if (luaL_loadfile(L, file))
             {
@@ -365,7 +365,7 @@ namespace LuaBinding {
             {
                 luaL_pushresult(&buf);
                 size_t len = 0;
-                auto r = std::string(const_cast<char *>(lua_tolstring(L, -1, &len)), len);
+                auto r = string_type(const_cast<char *>(lua_tolstring(L, -1, &len)), len);
                 lua_pop(L, 2);
                 return r;
             }
@@ -374,7 +374,7 @@ namespace LuaBinding {
 #endif
         }
 
-        ObjectRef dump(std::vector<char>& code, std::string fname)
+        ObjectRef dump(std::vector<char>& code, string_type fname)
         {
             if (luaL_loadbuffer(L, code.data(), code.size(), ("=" + fname).c_str()))
             {
@@ -616,8 +616,8 @@ namespace LuaBinding {
         template <class T>
         void global(const char* name, T thing)
         {
-            auto str = std::string(name);
-            if (str.find('.') != std::string::npos)
+            auto str = string_type(name);
+            if (str.find('.') != string_type::npos)
             {
                 auto enclosing_table = str.substr(0, str.find('.'));
                 auto real_class_name = str.substr(str.find('.') + 1);

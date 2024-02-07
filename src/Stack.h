@@ -498,9 +498,9 @@ namespace LuaBinding {
     };
 
     template<>
-    class Stack<std::string> {
+    class Stack<string_type> {
     public:
-        static int push(lua_State* L, std::string t)
+        static int push(lua_State* L, string_type t)
         {
             lua_pushstring(L, t.c_str());
             return 1;
@@ -508,7 +508,7 @@ namespace LuaBinding {
         static bool is(lua_State* L, int index) {
             return lua_isstring(L, index);
         }
-        static std::string get(lua_State* L, int index, int& offset)
+        static string_type get(lua_State* L, int index, int& offset)
         {
             size_t len;
             return { luaL_tolstring(L, index+offset, &len), len };

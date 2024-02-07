@@ -26,6 +26,7 @@ namespace LuaBinding {
     class TraitsCtor;
     template <class R, class... Params>
     class TraitsSTDFunction;
+    template <class T>
     class TraitsCFunc;
     template <class R, class T, class... Params>
     class TraitsClass;
