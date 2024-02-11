@@ -660,14 +660,28 @@ namespace LuaBinding {
             {
                 push_property_newindex();
                 new (lua_newuserdata(L, sizeof(set))) set_t(set);
-                lua_pushcclosure(L, TraitsClassPropertyCFun<R, T>::set, 1);
+                if constexpr (std::is_same_v<U, lua_State*>)
+                {
+                    lua_pushcclosure(L, TraitsClassPropertyCFunL<R, T>::set, 1);
+                }
+                else if constexpr (std::is_same_v<U, State>)
+                {
+                    lua_pushcclosure(L, TraitsClassPropertyCFunS<R, T>::set, 1);
+                }
                 lua_setfield(L, -2, name);
                 lua_pop(L, 1);
             }
 
             push_property_index();
             new (lua_newuserdata(L, sizeof(get))) get_t(get);
-            lua_pushcclosure(L, TraitsClassPropertyCFun<R, T>::get, 1);
+            if constexpr (std::is_same_v<U, lua_State*>)
+            {
+                lua_pushcclosure(L, TraitsClassPropertyCFunL<R, T>::get, 1);
+            }
+            else if constexpr (std::is_same_v<U, State>)
+            {
+                lua_pushcclosure(L, TraitsClassPropertyCFunS<R, T>::get, 1);
+            }
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
             return *this;

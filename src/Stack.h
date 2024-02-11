@@ -510,7 +510,7 @@ namespace LuaBinding {
         }
         static string_type get(lua_State* L, int index, int& offset)
         {
-            size_t len;
+            size_t len = 0;
             return { luaL_tolstring(L, index+offset, &len), len };
         }
         static const char* type_name(lua_State* L) {
