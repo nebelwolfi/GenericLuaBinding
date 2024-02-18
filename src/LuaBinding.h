@@ -250,7 +250,7 @@ namespace LuaBinding {
             lua_pop(L, 1);
         }
     }
-    static void StackDump(lua_State *L, decltype(printf) printfun)
+    static void StackDump(lua_State *L, decltype(printf) printfun = printf)
     {
         int i;
         int top = lua_gettop(L);

@@ -27,47 +27,47 @@ namespace LuaBinding {
     using function_type_t = typename FunctionDetail::function_traits<F>::function_type;
 
     namespace Function {
-        template <class T, class R, class... Params>
+        template <class R, class... Params>
         void fun(lua_State *L, R(* func)(Params...))
         {
             using FnType = decltype (func);
             new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsNClass<R, T, Params...>::f, 1);
+            lua_pushcclosure(L, TraitsNClass<R, Params...>::f, 1);
         }
 
-        template <class T, class R, class... Params>
-        void fun(lua_State *L, R(T::* func)(Params...))
+        template <class T, class Base, class R, class... Params> requires std::is_base_of_v<Base, T>
+        void fun(lua_State *L, R(Base::* func)(Params...))
         {
             using FnType = decltype (func);
             new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsClass<R, T, Params...>::f, 1);
+            lua_pushcclosure(L, TraitsClass<R, Base, Params...>::f, 1);
         }
 
-        template <class T, class R, class... Params>
-        void fun(lua_State *L, R(T::* func)(Params...) const)
+        template <class T, class Base, class R, class... Params> requires std::is_base_of_v<Base, T>
+        void fun(lua_State *L, R(Base::* func)(Params...) const)
         {
             using FnType = std::decay_t<decltype (func)>;
             new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsClass<R, T, Params...>::f, 1);
+            lua_pushcclosure(L, TraitsClass<R, Base, Params...>::f, 1);
         }
 
-        template <class T, class R, class... Params>
+        template <class T, class Base, class R, class... Params> requires std::is_base_of_v<Base, T>
         void fun(lua_State *L, std::function<R(Params...)> func)
         {
             using FnType = decltype (func);
             new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsFunClass<R, T, Params...>::f, 1);
+            lua_pushcclosure(L, TraitsFunClass<R, Base, Params...>::f, 1);
         }
 
-        template <class T, class R, class... Params>
+        template <class T, class Base, class R, class... Params> requires std::is_base_of_v<Base, T>
         void fun(lua_State *L, std::function<R(Params...) const> func)
         {
             using FnType = std::decay_t<decltype (func)>;
             new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsFunClass<R, T, Params...>::f, 1);
+            lua_pushcclosure(L, TraitsFunClass<R, Base, Params...>::f, 1);
         }
 
-        template <class T, class R> requires std::is_integral_v<R>
+        template <class T, class Base, class R> requires std::is_integral_v<R>
         void cfun(lua_State *L, R(T::*func)(lua_State*))
         {
             using func_t = decltype (func);
@@ -75,7 +75,7 @@ namespace LuaBinding {
             lua_pushcclosure(L, TraitsClassLCFunc<T>::f, 1);
         }
 
-        template <class T, class R> requires std::is_integral_v<R>
+        template <class T, class Base, class R> requires std::is_integral_v<R>
         void cfun(lua_State *L, std::function<R(T*, lua_State*)> func)
         {
             using FnType = decltype (func);
@@ -83,13 +83,13 @@ namespace LuaBinding {
             lua_pushcclosure(L, TraitsClassFunLCFunc<T>::f, 1);
         }
 
-        template <class T, class R> requires std::is_integral_v<R>
+        template <class T, class Base, class R> requires std::is_integral_v<R>
         void cfun(lua_State *L, R(*func)(lua_State*))
         {
             lua_pushcclosure(L, func, 0);
         }
 
-        template <class T, class R> requires std::is_integral_v<R>
+        template <class T, class Base, class R> requires std::is_integral_v<R>
         void cfun(lua_State *L, std::function<R(lua_State*)> func)
         {
             using FnType = decltype (func);
@@ -97,7 +97,7 @@ namespace LuaBinding {
             lua_pushcclosure(L, TraitsClassFunNLCFunc<T>::f, 1);
         }
 
-        template <class T, class R, class U> requires std::is_integral_v<R>
+        template <class T, class Base, class R, class U> requires std::is_integral_v<R>
         void cfun(lua_State *L, R(T::*func)(U))
         {
             using func_t = decltype (func);
@@ -105,14 +105,14 @@ namespace LuaBinding {
             lua_pushcclosure(L, TraitsClassCFunc<T>::f, 1);
         }
 
-        template <class T, class R, class U> requires std::is_integral_v<R>
+        template <class T, class Base, class R, class U> requires std::is_integral_v<R>
         void cfun(lua_State *L, R(*func)(U))
         {
             lua_pushlightuserdata(L, reinterpret_cast<void*>(func));
             lua_pushcclosure(L, TraitsClassNCFunc<T>::f, 1);
         }
 
-        template <class T, class R, class U> requires std::is_integral_v<R>
+        template <class T, class Base, class R, class U> requires std::is_integral_v<R>
         void cfun(lua_State *L, std::function<R(U)> func)
         {
             using FnType = decltype (func);
@@ -120,7 +120,7 @@ namespace LuaBinding {
             lua_pushcclosure(L, TraitsClassFunNCFunc<T>::f, 1);
         }
 
-        template <class T, class R, class U> requires std::is_integral_v<R>
+        template <class T, class Base, class R, class U> requires std::is_integral_v<R>
         void cfun(lua_State *L, std::function<R(T*, U)> func)
         {
             using FnType = decltype (func);
@@ -128,7 +128,7 @@ namespace LuaBinding {
             lua_pushcclosure(L, TraitsClassFunCFunc<T>::f, 1);
         }
 
-        template <class T, class R> requires std::is_integral_v<R>
+        template <class T, class Base, class R> requires std::is_integral_v<R>
         void cfun(lua_State *L, R(*func)(State))
         {
             using FnType = decltype (func);
@@ -136,28 +136,28 @@ namespace LuaBinding {
             lua_pushcclosure(L, TraitsCFunc<T>::f, 1);
         }
         
-        template <class T, class F>
+        template <class T, class F, class Base = T>
         void fun(lua_State *L, F& func)
         {
-            fun<T>(L, static_cast<function_type_t<std::decay_t<F>>>(func));
+            fun<T, Base>(L, static_cast<function_type_t<std::decay_t<F>>>(func));
         }
 
-        template <class T, class F>
+        template <class T, class F, class Base = T>
         void cfun(lua_State *L, F& func)
         {
-            cfun<T>(L, static_cast<function_type_t<std::decay_t<F>>>(func));
+            cfun<T, Base>(L, static_cast<function_type_t<std::decay_t<F>>>(func));
         }
         
-        template <class T, class F>
+        template <class T, class F, class Base = T>
         void fun(lua_State *L, F&& func)
         {
-            fun<T>(L, static_cast<function_type_t<std::decay_t<F>>>(func));
+            fun<T, Base>(L, static_cast<function_type_t<std::decay_t<F>>>(func));
         }
 
-        template <class T, class F>
+        template <class T, class F, class Base = T>
         void cfun(lua_State *L, F&& func)
         {
-            cfun<T>(L, static_cast<function_type_t<std::decay_t<F>>>(func));
+            cfun<T, Base>(L, static_cast<function_type_t<std::decay_t<F>>>(func));
         }
     }
 

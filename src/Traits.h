@@ -203,7 +203,7 @@ namespace LuaBinding {
         }
     };
 
-    template <class R, class T, class... Params>
+    template <class R, class... Params>
     class TraitsNClass {
         using ParamList = std::tuple<std::decay_t<Params>...>;
     public:

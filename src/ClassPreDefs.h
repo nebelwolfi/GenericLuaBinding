@@ -32,7 +32,7 @@ namespace LuaBinding {
     class TraitsClass;
     template <class R, class T, class... Params>
     class TraitsFunClass;
-    template <class R, class T, class... Params>
+    template <class R, class... Params>
     class TraitsNClass;
     template <class T>
     class TraitsClassNCFunc;

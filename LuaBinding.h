@@ -251,7 +251,7 @@ namespace LuaBinding {
             lua_pop(L, 1);
         }
     }
-    static void StackDump(lua_State *L, decltype(printf) printfun)
+    static void StackDump(lua_State *L, decltype(printf) printfun = printf)
     {
         int i;
         int top = lua_gettop(L);
@@ -329,7 +329,7 @@ namespace LuaBinding {
     class TraitsClass;
     template <class R, class T, class... Params>
     class TraitsFunClass;
-    template <class R, class T, class... Params>
+    template <class R, class... Params>
     class TraitsNClass;
     template <class T>
     class TraitsClassNCFunc;
@@ -384,6 +384,7 @@ namespace LuaBinding {
 #include <deque>
 #include <unordered_set>
 #include <unordered_map>
+#include <atomic>
 
 namespace LuaBinding {
     namespace detail {
@@ -392,18 +393,28 @@ namespace LuaBinding {
             { LuaBinding::Stack<std::decay_t<T>>::is(nullptr, 0) };
         };
 
-        template<class T> requires is_pushable<T>
+        template<typename T>
+        concept is_atomic = std::is_same_v<T, std::atomic<typename T::value_type>>;
+
+        template<class T> requires is_pushable<T> && (!is_atomic<T>)
         T get(lua_State* L, int index)
         {
             int offset = 0;
             return Stack<T>::get(L, index, offset);
         }
 
-        template<class T> requires (!is_pushable<T>)
+        template<class T> requires (!is_pushable<T>) && (!is_atomic<T>)
         T get(lua_State* L, int index)
         {
             int offset = 0;
             return StackClass<T>::get(L, index, offset);
+        }
+
+        template<class T> requires is_atomic<T>
+        T::value_type get(lua_State* L, int index)
+        {
+            int offset = 0;
+            return Stack<T>::get(L, index, offset);
         }
 
         template<class T> requires is_pushable<T>
@@ -427,7 +438,7 @@ namespace LuaBinding {
         template<class T> requires is_pushable<T>
         int push(lua_State* L, T&& t)
         {
-            return Stack<T>::push(L, t);
+            return Stack<T>::push(L, std::move(t));
         }
 
         template<class T> requires is_pushable<T>
@@ -875,7 +886,7 @@ namespace LuaBinding {
     public:
         static int push(lua_State* L, string_type t)
         {
-            lua_pushstring(L, t.c_str());
+            lua_pushlstring(L, t.data(), t.size());
             return 1;
         }
         static bool is(lua_State* L, int index) {
@@ -1094,6 +1105,32 @@ namespace LuaBinding {
         }
         static int basic_type(lua_State* L) {
             return LUA_TTABLE;
+        }
+    };
+
+    template<typename T>
+    class Stack<std::atomic<T>> {
+    public:
+        static int push(lua_State* L, std::atomic<T>& t)
+        {
+            detail::push<T>(L, t.load());
+            return 1;
+        }
+        static bool is(lua_State* L, int index) {
+            return Stack<T>::is(L, index);
+        }
+        static T get(lua_State* L, int index, int& offset)
+        {
+            return detail::get<T>(L, index+offset);
+        }
+        static const char* type_name(lua_State* L) {
+            return Stack<T>::type_name(L);
+        }
+        static const char* basic_type_name(lua_State* L) {
+            return Stack<T>::basic_type_name(L);
+        }
+        static int basic_type(lua_State* L) {
+            return Stack<T>::basic_type(L);
         }
     };
 
@@ -1618,47 +1655,47 @@ namespace LuaBinding {
     using function_type_t = typename FunctionDetail::function_traits<F>::function_type;
 
     namespace Function {
-        template <class T, class R, class... Params>
+        template <class R, class... Params>
         void fun(lua_State *L, R(* func)(Params...))
         {
             using FnType = decltype (func);
             new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsNClass<R, T, Params...>::f, 1);
+            lua_pushcclosure(L, TraitsNClass<R, Params...>::f, 1);
         }
 
-        template <class T, class R, class... Params>
-        void fun(lua_State *L, R(T::* func)(Params...))
+        template <class T, class Base, class R, class... Params> requires std::is_base_of_v<Base, T>
+        void fun(lua_State *L, R(Base::* func)(Params...))
         {
             using FnType = decltype (func);
             new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsClass<R, T, Params...>::f, 1);
+            lua_pushcclosure(L, TraitsClass<R, Base, Params...>::f, 1);
         }
 
-        template <class T, class R, class... Params>
-        void fun(lua_State *L, R(T::* func)(Params...) const)
+        template <class T, class Base, class R, class... Params> requires std::is_base_of_v<Base, T>
+        void fun(lua_State *L, R(Base::* func)(Params...) const)
         {
             using FnType = std::decay_t<decltype (func)>;
             new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsClass<R, T, Params...>::f, 1);
+            lua_pushcclosure(L, TraitsClass<R, Base, Params...>::f, 1);
         }
 
-        template <class T, class R, class... Params>
+        template <class T, class Base, class R, class... Params> requires std::is_base_of_v<Base, T>
         void fun(lua_State *L, std::function<R(Params...)> func)
         {
             using FnType = decltype (func);
             new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsFunClass<R, T, Params...>::f, 1);
+            lua_pushcclosure(L, TraitsFunClass<R, Base, Params...>::f, 1);
         }
 
-        template <class T, class R, class... Params>
+        template <class T, class Base, class R, class... Params> requires std::is_base_of_v<Base, T>
         void fun(lua_State *L, std::function<R(Params...) const> func)
         {
             using FnType = std::decay_t<decltype (func)>;
             new (lua_newuserdata(L, sizeof(func))) FnType(func);
-            lua_pushcclosure(L, TraitsFunClass<R, T, Params...>::f, 1);
+            lua_pushcclosure(L, TraitsFunClass<R, Base, Params...>::f, 1);
         }
 
-        template <class T, class R> requires std::is_integral_v<R>
+        template <class T, class Base, class R> requires std::is_integral_v<R>
         void cfun(lua_State *L, R(T::*func)(lua_State*))
         {
             using func_t = decltype (func);
@@ -1666,7 +1703,7 @@ namespace LuaBinding {
             lua_pushcclosure(L, TraitsClassLCFunc<T>::f, 1);
         }
 
-        template <class T, class R> requires std::is_integral_v<R>
+        template <class T, class Base, class R> requires std::is_integral_v<R>
         void cfun(lua_State *L, std::function<R(T*, lua_State*)> func)
         {
             using FnType = decltype (func);
@@ -1674,13 +1711,13 @@ namespace LuaBinding {
             lua_pushcclosure(L, TraitsClassFunLCFunc<T>::f, 1);
         }
 
-        template <class T, class R> requires std::is_integral_v<R>
+        template <class T, class Base, class R> requires std::is_integral_v<R>
         void cfun(lua_State *L, R(*func)(lua_State*))
         {
             lua_pushcclosure(L, func, 0);
         }
 
-        template <class T, class R> requires std::is_integral_v<R>
+        template <class T, class Base, class R> requires std::is_integral_v<R>
         void cfun(lua_State *L, std::function<R(lua_State*)> func)
         {
             using FnType = decltype (func);
@@ -1688,7 +1725,7 @@ namespace LuaBinding {
             lua_pushcclosure(L, TraitsClassFunNLCFunc<T>::f, 1);
         }
 
-        template <class T, class R, class U> requires std::is_integral_v<R>
+        template <class T, class Base, class R, class U> requires std::is_integral_v<R>
         void cfun(lua_State *L, R(T::*func)(U))
         {
             using func_t = decltype (func);
@@ -1696,14 +1733,14 @@ namespace LuaBinding {
             lua_pushcclosure(L, TraitsClassCFunc<T>::f, 1);
         }
 
-        template <class T, class R, class U> requires std::is_integral_v<R>
+        template <class T, class Base, class R, class U> requires std::is_integral_v<R>
         void cfun(lua_State *L, R(*func)(U))
         {
             lua_pushlightuserdata(L, reinterpret_cast<void*>(func));
             lua_pushcclosure(L, TraitsClassNCFunc<T>::f, 1);
         }
 
-        template <class T, class R, class U> requires std::is_integral_v<R>
+        template <class T, class Base, class R, class U> requires std::is_integral_v<R>
         void cfun(lua_State *L, std::function<R(U)> func)
         {
             using FnType = decltype (func);
@@ -1711,7 +1748,7 @@ namespace LuaBinding {
             lua_pushcclosure(L, TraitsClassFunNCFunc<T>::f, 1);
         }
 
-        template <class T, class R, class U> requires std::is_integral_v<R>
+        template <class T, class Base, class R, class U> requires std::is_integral_v<R>
         void cfun(lua_State *L, std::function<R(T*, U)> func)
         {
             using FnType = decltype (func);
@@ -1719,7 +1756,7 @@ namespace LuaBinding {
             lua_pushcclosure(L, TraitsClassFunCFunc<T>::f, 1);
         }
 
-        template <class T, class R> requires std::is_integral_v<R>
+        template <class T, class Base, class R> requires std::is_integral_v<R>
         void cfun(lua_State *L, R(*func)(State))
         {
             using FnType = decltype (func);
@@ -1727,28 +1764,28 @@ namespace LuaBinding {
             lua_pushcclosure(L, TraitsCFunc<T>::f, 1);
         }
         
-        template <class T, class F>
+        template <class T, class F, class Base = T>
         void fun(lua_State *L, F& func)
         {
-            fun<T>(L, static_cast<function_type_t<std::decay_t<F>>>(func));
+            fun<T, Base>(L, static_cast<function_type_t<std::decay_t<F>>>(func));
         }
 
-        template <class T, class F>
+        template <class T, class F, class Base = T>
         void cfun(lua_State *L, F& func)
         {
-            cfun<T>(L, static_cast<function_type_t<std::decay_t<F>>>(func));
+            cfun<T, Base>(L, static_cast<function_type_t<std::decay_t<F>>>(func));
         }
         
-        template <class T, class F>
+        template <class T, class F, class Base = T>
         void fun(lua_State *L, F&& func)
         {
-            fun<T>(L, static_cast<function_type_t<std::decay_t<F>>>(func));
+            fun<T, Base>(L, static_cast<function_type_t<std::decay_t<F>>>(func));
         }
 
-        template <class T, class F>
+        template <class T, class F, class Base = T>
         void cfun(lua_State *L, F&& func)
         {
-            cfun<T>(L, static_cast<function_type_t<std::decay_t<F>>>(func));
+            cfun<T, Base>(L, static_cast<function_type_t<std::decay_t<F>>>(func));
         }
     }
 
@@ -3704,6 +3741,7 @@ namespace LuaBinding {
         lua_State* L = nullptr;
         const char* class_name;
     public:
+        using value_type = T;
         Class(lua_State* L, const char* name) : L(L), class_name(name)
         {
             if (!push_metatable())
@@ -4153,8 +4191,8 @@ namespace LuaBinding {
             return *this;
         }
 
-        template<class R>
-        Class<T>& prop(const char* name, R(T::* prop))
+        template<class R, class Base> requires std::is_base_of_v<Base, T>
+        Class<T>& prop(const char* name, R(Base::* prop))
         {
             using PropType = decltype (prop);
 
@@ -4163,11 +4201,11 @@ namespace LuaBinding {
             push_property_newindex();
             new (lua_newuserdata(L, sizeof(prop))) PropType(prop);
             lua_pushvalue(L, -1);
-            lua_pushcclosure(L, TraitsClassProperty<std::decay_t<R>, std::decay_t<T>>::set, 1);
+            lua_pushcclosure(L, TraitsClassProperty<std::decay_t<R>, std::decay_t<Base>>::set, 1);
             lua_setfield(L, -3, name);
             lua_remove(L, -2);
 
-            lua_pushcclosure(L, TraitsClassProperty<std::decay_t<R>, std::decay_t<T>>::get, 1);
+            lua_pushcclosure(L, TraitsClassProperty<std::decay_t<R>, std::decay_t<Base>>::get, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
             return *this;
@@ -4196,8 +4234,8 @@ namespace LuaBinding {
             return *this;
         }
 
-        template<class R>
-        Class<T>& prop_fun(const char* name, R(T::* get)(), void(T::* set)(R) = nullptr)
+        template<class R, class Base> requires std::is_base_of_v<Base, T>
+        Class<T>& prop_fun(const char* name, R(Base::* get)(), void(Base::* set)(R) = nullptr)
         {
             using get_t = decltype (get);
             using set_t = decltype (set);
@@ -4206,21 +4244,21 @@ namespace LuaBinding {
             {
                 push_property_newindex();
                 new (lua_newuserdata(L, sizeof(set))) set_t(set);
-                lua_pushcclosure(L, TraitsClassPropertyFn<R, T>::set, 1);
+                lua_pushcclosure(L, TraitsClassPropertyFn<R, Base>::set, 1);
                 lua_setfield(L, -2, name);
                 lua_pop(L, 1);
             }
 
             push_property_index();
             new (lua_newuserdata(L, sizeof(get))) get_t(get);
-            lua_pushcclosure(L, TraitsClassPropertyFn<R, T>::get, 1);
+            lua_pushcclosure(L, TraitsClassPropertyFn<R, Base>::get, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
             return *this;
         }
 
-        template<class R>
-        Class<T>& prop_fun(const char* name, R(T::* get)() const, void(T::* set)(R) const = nullptr)
+        template<class R, class Base> requires std::is_base_of_v<Base, T>
+        Class<T>& prop_fun(const char* name, R(Base::* get)() const, void(Base::* set)(R) const = nullptr)
         {
             using get_t = std::decay_t<decltype (get)>;
             using set_t = std::decay_t<decltype (set)>;
@@ -4229,14 +4267,14 @@ namespace LuaBinding {
             {
                 push_property_newindex();
                 new (lua_newuserdata(L, sizeof(set))) set_t(set);
-                lua_pushcclosure(L, TraitsClassPropertyFn<R, T>::set, 1);
+                lua_pushcclosure(L, TraitsClassPropertyFn<R, Base>::set, 1);
                 lua_setfield(L, -2, name);
                 lua_pop(L, 1);
             }
 
             push_property_index();
             new (lua_newuserdata(L, sizeof(get))) get_t(get);
-            lua_pushcclosure(L, TraitsClassPropertyFn<R, T>::get, 1);
+            lua_pushcclosure(L, TraitsClassPropertyFn<R, Base>::get, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
             return *this;
@@ -4265,8 +4303,8 @@ namespace LuaBinding {
             return *this;
         }
 
-        template <class R>
-        Class<T>& prop_fun(const char* name, std::function<R(T*)> get, std::function<void(T*, R)> set = nullptr)
+        template<class R, class Base> requires std::is_base_of_v<Base, T>
+        Class<T>& prop_fun(const char* name, std::function<R(Base*)> get, std::function<void(Base*, R)> set = nullptr)
         {
             using get_t = decltype (get);
             using set_t = decltype (set);
@@ -4275,14 +4313,14 @@ namespace LuaBinding {
             {
                 push_property_newindex();
                 new (lua_newuserdata(L, sizeof(set))) set_t(set);
-                lua_pushcclosure(L, TraitsClassPropertyFunFn<R, T>::set, 1);
+                lua_pushcclosure(L, TraitsClassPropertyFunFn<R, Base>::set, 1);
                 lua_setfield(L, -2, name);
                 lua_pop(L, 1);
             }
 
             push_property_index();
             new (lua_newuserdata(L, sizeof(get))) get_t(get);
-            lua_pushcclosure(L, TraitsClassPropertyFunFn<R, T>::get, 1);
+            lua_pushcclosure(L, TraitsClassPropertyFunFn<R, Base>::get, 1);
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
             return *this;
@@ -4302,7 +4340,7 @@ namespace LuaBinding {
             return *this;
         }
 
-        template <class R, class U> requires std::is_integral_v<R>
+        template <class R, class U> requires std::is_integral_v<R> && (std::is_same_v<U, State> || std::is_same_v<U, lua_State*>)
         Class<T>& prop_cfun(const char* name, R(*get)(U), R(*set)(U) = nullptr)
         {
             using get_t = decltype (get);
@@ -4311,22 +4349,36 @@ namespace LuaBinding {
             if (set)
             {
                 push_property_newindex();
-                new (lua_newuserdata(L, sizeof(set))) set_t(set);
-                lua_pushcclosure(L, TraitsClassPropertyNCFun<R, T>::set, 1);
+                if constexpr (std::is_same_v<U, lua_State*>)
+                {
+                    lua_pushcclosure(L, set, 1);
+                }
+                else if constexpr (std::is_same_v<U, State>)
+                {
+                    new (lua_newuserdata(L, sizeof(set))) set_t(set);
+                    lua_pushcclosure(L, TraitsClassPropertyNCFun<R, T>::set, 1);
+                }
                 lua_setfield(L, -2, name);
                 lua_pop(L, 1);
             }
 
             push_property_index();
-            new (lua_newuserdata(L, sizeof(get))) get_t(get);
-            lua_pushcclosure(L, TraitsClassPropertyNCFun<R, T>::get, 1);
+            if constexpr (std::is_same_v<U, lua_State*>)
+            {
+                lua_pushcclosure(L, get, 1);
+            }
+            else if constexpr (std::is_same_v<U, State>)
+            {
+                new (lua_newuserdata(L, sizeof(get))) get_t(get);
+                lua_pushcclosure(L, TraitsClassPropertyNCFun<R, T>::get, 1);
+            }
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
             return *this;
         }
 
-        template <class R, class U> requires std::is_integral_v<R>
-        Class<T>& prop_cfun(const char* name, R(T::*get)(U), R(T::*set)(U) = nullptr)
+        template <class R, class U, class Base> requires std::is_integral_v<R> && (std::is_same_v<U, State> || std::is_same_v<U, lua_State*>) && std::is_base_of_v<Base, T>
+        Class<T>& prop_cfun(const char* name, R(Base::*get)(U), R(Base::*set)(U) = nullptr)
         {
             using get_t = decltype (get);
             using set_t = decltype (set);
@@ -4337,11 +4389,11 @@ namespace LuaBinding {
                 new (lua_newuserdata(L, sizeof(set))) set_t(set);
                 if constexpr (std::is_same_v<U, lua_State*>)
                 {
-                    lua_pushcclosure(L, TraitsClassPropertyCFunL<R, T>::set, 1);
+                    lua_pushcclosure(L, TraitsClassPropertyCFunL<R, Base>::set, 1);
                 }
                 else if constexpr (std::is_same_v<U, State>)
                 {
-                    lua_pushcclosure(L, TraitsClassPropertyCFunS<R, T>::set, 1);
+                    lua_pushcclosure(L, TraitsClassPropertyCFunS<R, Base>::set, 1);
                 }
                 lua_setfield(L, -2, name);
                 lua_pop(L, 1);
@@ -4351,64 +4403,18 @@ namespace LuaBinding {
             new (lua_newuserdata(L, sizeof(get))) get_t(get);
             if constexpr (std::is_same_v<U, lua_State*>)
             {
-                lua_pushcclosure(L, TraitsClassPropertyCFunL<R, T>::get, 1);
+                lua_pushcclosure(L, TraitsClassPropertyCFunL<R, Base>::get, 1);
             }
             else if constexpr (std::is_same_v<U, State>)
             {
-                lua_pushcclosure(L, TraitsClassPropertyCFunS<R, T>::get, 1);
+                lua_pushcclosure(L, TraitsClassPropertyCFunS<R, Base>::get, 1);
             }
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
             return *this;
         }
 
-        template <class R> requires std::is_integral_v<R>
-        Class<T>& prop_cfun(const char* name, std::function<R(lua_State*)> get, std::function<R(lua_State*)> set = nullptr)
-        {
-            using get_t = decltype (get);
-            using set_t = decltype (set);
-
-            if (set)
-            {
-                push_property_newindex();
-                new (lua_newuserdata(L, sizeof(set))) set_t(set);
-                lua_pushcclosure(L, TraitsClassPropertyNFunLCFn<R, T>::set, 1);
-                lua_setfield(L, -2, name);
-                lua_pop(L, 1);
-            }
-
-            push_property_index();
-            new (lua_newuserdata(L, sizeof(get))) get_t(get);
-            lua_pushcclosure(L, TraitsClassPropertyNFunLCFn<R, T>::get, 1);
-            lua_setfield(L, -2, name);
-            lua_pop(L, 1);
-            return *this;
-        }
-
-        template <class R> requires std::is_integral_v<R>
-        Class<T>& prop_cfun(const char* name, std::function<R(T*, lua_State*)> get, std::function<R(T*, lua_State*)> set = nullptr)
-        {
-            using get_t = decltype (get);
-            using set_t = decltype (set);
-
-            if (set)
-            {
-                push_property_newindex();
-                new (lua_newuserdata(L, sizeof(set))) set_t(set);
-                lua_pushcclosure(L, TraitsClassPropertyFunLCFn<R, T>::set, 1);
-                lua_setfield(L, -2, name);
-                lua_pop(L, 1);
-            }
-
-            push_property_index();
-            new (lua_newuserdata(L, sizeof(get))) get_t(get);
-            lua_pushcclosure(L, TraitsClassPropertyFunLCFn<R, T>::get, 1);
-            lua_setfield(L, -2, name);
-            lua_pop(L, 1);
-            return *this;
-        }
-
-        template <class R, class U> requires std::is_integral_v<R>
+        template <class R, class U> requires std::is_integral_v<R> && (std::is_same_v<U, State> || std::is_same_v<U, lua_State*>)
         Class<T>& prop_cfun(const char* name, std::function<R(U)> get, std::function<R(U)> set = nullptr)
         {
             using get_t = decltype (get);
@@ -4418,21 +4424,35 @@ namespace LuaBinding {
             {
                 push_property_newindex();
                 new (lua_newuserdata(L, sizeof(set))) set_t(set);
-                lua_pushcclosure(L, TraitsClassPropertyNFunCFn<R, T>::set, 1);
+                if constexpr (std::is_same_v<U, lua_State*>)
+                {
+                    lua_pushcclosure(L, TraitsClassPropertyNFunLCFn<R, T>::set, 1);
+                }
+                else if constexpr (std::is_same_v<U, State>)
+                {
+                    lua_pushcclosure(L, TraitsClassPropertyNFunCFn<R, T>::set, 1);
+                }
                 lua_setfield(L, -2, name);
                 lua_pop(L, 1);
             }
 
             push_property_index();
             new (lua_newuserdata(L, sizeof(get))) get_t(get);
-            lua_pushcclosure(L, TraitsClassPropertyNFunCFn<R, T>::get, 1);
+            if constexpr (std::is_same_v<U, lua_State*>)
+            {
+                lua_pushcclosure(L, TraitsClassPropertyNFunLCFn<R, T>::get, 1);
+            }
+            else if constexpr (std::is_same_v<U, State>)
+            {
+                lua_pushcclosure(L, TraitsClassPropertyNFunCFn<R, T>::get, 1);
+            }
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
             return *this;
         }
 
-        template <class R, class U> requires std::is_integral_v<R>
-        Class<T>& prop_cfun(const char* name, std::function<R(T*, U)> get, std::function<R(T*, U)> set = nullptr)
+        template <class R, class U, class Base> requires std::is_integral_v<R> && (std::is_same_v<U, State> || std::is_same_v<U, lua_State*>) && std::is_base_of_v<Base, T>
+        Class<T>& prop_cfun(const char* name, std::function<R(Base*, U)> get, std::function<R(Base*, U)> set = nullptr)
         {
             using get_t = decltype (get);
             using set_t = decltype (set);
@@ -4441,14 +4461,28 @@ namespace LuaBinding {
             {
                 push_property_newindex();
                 new (lua_newuserdata(L, sizeof(set))) set_t(set);
-                lua_pushcclosure(L, TraitsClassPropertyFunLCFn<R, T>::set, 1);
+                if constexpr (std::is_same_v<U, lua_State*>)
+                {
+                    lua_pushcclosure(L, TraitsClassPropertyFunLCFn<R, Base>::set, 1);
+                }
+                else if constexpr (std::is_same_v<U, State>)
+                {
+                    lua_pushcclosure(L, TraitsClassPropertyFunC<R, Base>::set, 1);
+                }
                 lua_setfield(L, -2, name);
                 lua_pop(L, 1);
             }
 
             push_property_index();
             new (lua_newuserdata(L, sizeof(get))) get_t(get);
-            lua_pushcclosure(L, TraitsClassPropertyFunLCFn<R, T>::get, 1);
+            if constexpr (std::is_same_v<U, lua_State*>)
+            {
+                lua_pushcclosure(L, TraitsClassPropertyFunLCFn<R, Base>::get, 1);
+            }
+            else if constexpr (std::is_same_v<U, State>)
+            {
+                lua_pushcclosure(L, TraitsClassPropertyFunC<R, Base>::get, 1);
+            }
             lua_setfield(L, -2, name);
             lua_pop(L, 1);
             return *this;
@@ -5382,7 +5416,7 @@ namespace LuaBinding {
         }
     };
 
-    template <class R, class T, class... Params>
+    template <class R, class... Params>
     class TraitsNClass {
         using ParamList = std::tuple<std::decay_t<Params>...>;
     public:

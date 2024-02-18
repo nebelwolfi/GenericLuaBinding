@@ -11,6 +11,7 @@
 #include <deque>
 #include <unordered_set>
 #include <unordered_map>
+#include <atomic>
 
 namespace LuaBinding {
     namespace detail {
@@ -19,18 +20,28 @@ namespace LuaBinding {
             { LuaBinding::Stack<std::decay_t<T>>::is(nullptr, 0) };
         };
 
-        template<class T> requires is_pushable<T>
+        template<typename T>
+        concept is_atomic = std::is_same_v<T, std::atomic<typename T::value_type>>;
+
+        template<class T> requires is_pushable<T> && (!is_atomic<T>)
         T get(lua_State* L, int index)
         {
             int offset = 0;
             return Stack<T>::get(L, index, offset);
         }
 
-        template<class T> requires (!is_pushable<T>)
+        template<class T> requires (!is_pushable<T>) && (!is_atomic<T>)
         T get(lua_State* L, int index)
         {
             int offset = 0;
             return StackClass<T>::get(L, index, offset);
+        }
+
+        template<class T> requires is_atomic<T>
+        T::value_type get(lua_State* L, int index)
+        {
+            int offset = 0;
+            return Stack<T>::get(L, index, offset);
         }
 
         template<class T> requires is_pushable<T>
@@ -54,7 +65,7 @@ namespace LuaBinding {
         template<class T> requires is_pushable<T>
         int push(lua_State* L, T&& t)
         {
-            return Stack<T>::push(L, t);
+            return Stack<T>::push(L, std::move(t));
         }
 
         template<class T> requires is_pushable<T>
@@ -502,7 +513,7 @@ namespace LuaBinding {
     public:
         static int push(lua_State* L, string_type t)
         {
-            lua_pushstring(L, t.c_str());
+            lua_pushlstring(L, t.data(), t.size());
             return 1;
         }
         static bool is(lua_State* L, int index) {
@@ -721,6 +732,32 @@ namespace LuaBinding {
         }
         static int basic_type(lua_State* L) {
             return LUA_TTABLE;
+        }
+    };
+
+    template<typename T>
+    class Stack<std::atomic<T>> {
+    public:
+        static int push(lua_State* L, std::atomic<T>& t)
+        {
+            detail::push<T>(L, t.load());
+            return 1;
+        }
+        static bool is(lua_State* L, int index) {
+            return Stack<T>::is(L, index);
+        }
+        static T get(lua_State* L, int index, int& offset)
+        {
+            return detail::get<T>(L, index+offset);
+        }
+        static const char* type_name(lua_State* L) {
+            return Stack<T>::type_name(L);
+        }
+        static const char* basic_type_name(lua_State* L) {
+            return Stack<T>::basic_type_name(L);
+        }
+        static int basic_type(lua_State* L) {
+            return Stack<T>::basic_type(L);
         }
     };
 
